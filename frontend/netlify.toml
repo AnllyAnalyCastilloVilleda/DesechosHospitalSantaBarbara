@@ -1,0 +1,5 @@
+[build]
+# Si tu base ya es /frontend en la UI, puedes omitir "base".
+base = "frontend"
+command = "CI= npm run build"
+publish = "build"
