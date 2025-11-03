@@ -86,6 +86,19 @@ const corsOptions = {
   credentials: false, // no usamos cookies; el token va en Authorization
 };
 
+// CORS ABIERTO (sin cookies). Útil mientras estabilizamos.
+// Colócalo inmediatamente después de: const app = express();
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*'); // o pon tu dominio si quieres restringir
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Preflight corta aquí con 204 para que no pase a routers que no manejan OPTIONS
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+
+
 // CORS global + respuesta a preflights
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
