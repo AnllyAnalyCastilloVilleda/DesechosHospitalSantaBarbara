@@ -1,0 +1,45 @@
+{
+  "name": "desechos-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "author": "",
+  "license": "ISC",
+  "main": "index.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    "postinstall": "prisma generate",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:generate": "prisma generate",
+    "seed": "node prisma/seed.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:db": "node src/scripts/test-prisma.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.18.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "nodemailer": "^7.0.6",
+    "pdfkit": "^0.17.2",
+    "pg": "^8.16.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1"
+  },
+  "optionalDependencies": {
+    "serialport": "^13.0.0",
+    "@serialport/parser-readline": "^13.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10",
+    "prisma": "^6.18.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}

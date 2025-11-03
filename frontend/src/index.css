@@ -1,0 +1,102 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* ===== Ajustes móviles ===== */
+@media (max-width: 768px) {
+  /* reduce márgenes laterales del layout bootstrap */
+  .container,
+  .container-fluid {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  /* header “Hola, Administrador” + botón cerrar */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 4px;
+    margin-bottom: 10px;
+  }
+  .topbar .saludo {
+    font-size: 1rem;
+    line-height: 1.2;
+    margin: 0;
+  }
+  .topbar .btn-cerrar {
+    padding: 6px 12px;
+    font-size: .9rem;
+    border-radius: 12px;
+  }
+
+  /* tarjeta “Panel principal”: más ancha, menos orilla */
+  .panel-principal {
+    width: 100%;
+    max-width: 980px;           /* no limita en móvil, ayuda en tablet */
+    margin: 0 auto 14px auto;
+    padding: 14px !important;   /* compacta */
+    border-radius: 18px !important;
+  }
+  .panel-principal h1,
+  .panel-principal h2 {
+    font-size: 1.35rem;
+    margin-bottom: 8px;
+  }
+  .panel-principal p {
+    font-size: .98rem;
+    margin-bottom: 14px;
+  }
+
+  /* botones del panel: un poco más pequeños y a 100% */
+  .panel-principal .btn {
+    width: 100%;
+    max-width: 360px;
+    margin: 8px auto;
+    display: block;
+    padding: 10px 16px;
+    font-size: 1rem;
+    border-radius: 14px;
+  }
+
+  /* tarjetas KPI: compactas y con mejor legibilidad */
+  .kpi {
+    padding: 12px !important;
+    border-radius: 14px !important;
+    margin-bottom: 10px;
+  }
+  .kpi .kpi-title { font-size: .95rem; opacity:.8; }
+  .kpi .kpi-value { font-size: 1.3rem; font-weight: 700; }
+}
+
+
+/* Botón "Cerrar sesión" aún más compacto en móvil */
+@media (max-width: 768px) {
+  .btn-cerrar,
+  .topbar .btn.btn-outline-light {
+    font-size: 0.75rem !important;   /* letras más pequeñas */
+    padding: 4px 8px !important;     /* menos espacio interno */
+    border-radius: 10px;             /* bordes un poco más redondeados */
+    line-height: 1.1;
+  }
+
+  /* icono más pequeño dentro del botón */
+  .btn-cerrar svg,
+  .btn-cerrar img {
+    width: 14px !important;
+    height: 14px !important;
+    margin-right: 4px;
+  }
+}
+

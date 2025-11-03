@@ -1,0 +1,296 @@
+/* ========= Layout base ========= */
+.u-page { max-width:1120px; margin:24px auto; padding:0 16px; }
+
+.u-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+.u-head h2 { margin:0; font-size:22px; color:#0f172a; }
+.u-head-actions { display:flex; gap:8px; flex-wrap:wrap; }
+
+/* ========= Cards y tablas ========= */
+.u-card{
+  background:#fff;
+  border-radius:14px;
+  border:1px solid #e5e7eb;
+  box-shadow:0 6px 24px rgba(2,8,20,.05);
+  padding:14px;
+  margin-bottom:16px;
+  overflow-x:hidden; /* sin barra horizontal */
+}
+
+.u-input{
+  height:38px; padding:0 12px; border:1px solid #cbd5e1; border-radius:10px;
+  outline:none; font-size:14px; width:260px; max-width:100%;
+}
+.u-input:focus{ border-color:#3f51b5; box-shadow:0 0 0 3px rgba(63,81,181,.15); }
+
+.u-table{ width:100%; border-collapse:collapse; table-layout:fixed; }
+.u-table th, .u-table td{
+  padding:10px 12px;
+  border-bottom:1px solid #e5e7eb;
+  font-size:14px;
+  text-align:left;
+  vertical-align:top;
+}
+.u-table thead th{
+  background:#f0f4ff;
+  color:#3f51b5;
+  font-weight:600;
+  white-space:nowrap;
+}
+
+/* ========= Botones ========= */
+.u-btn{
+  height:38px;
+  padding:0 14px;
+  border-radius:10px;
+  border:1px solid transparent;
+  font-weight:600;
+  cursor:pointer;
+  transition: transform .02s, box-shadow .2s, background .2s, color .2s;
+}
+.u-btn:active{ transform:translateY(1px); }
+.u-btn--xs{ height:30px; padding:0 8px; font-size:12.5px; border-radius:8px; }
+
+.u-btn-primary{ background:#3f51b5; color:#fff; } .u-btn-primary:hover{ background:#2c3e90; }
+.u-btn-light{ background:#f8fafc; color:#0f172a; border-color:#e2e8f0; } .u-btn-light:hover{ background:#eef2ff; }
+.u-btn-yellow{ background:#ffc107; color:#000; } .u-btn-yellow:hover{ background:#e0a800; }
+.u-btn-success{ background:#16a34a; color:#fff; } .u-btn-success:hover{ background:#15803d; }
+.u-btn-danger{ background:#e53935; color:#fff; } .u-btn-danger:hover{ background:#c62828; }
+.u-btn-blue{ background:#2563eb; color:#fff; } .u-btn-blue:hover{ background:#1e40af; }
+
+/* ========= Badges de estado ========= */
+.u-status{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 10px; border-radius:999px; font-size:12px; border:1px solid transparent;
+}
+.u-status.ok  { color:#166534; background:#ecfdf5; border-color:#bbf7d0; }
+.u-status.off { color:#92400e; background:#fffbeb; border-color:#fde68a; }
+
+/* ========= Modal ========= */
+.u-modal-overlay{
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  background:rgba(16,24,40,.35); backdrop-filter:blur(6px); z-index:2000; padding:16px;
+}
+.u-modal-card{
+  width:100%; max-width:560px; background:#fff; border-radius:16px;
+  border:1px solid rgba(53,87,255,.10); box-shadow:0 20px 60px rgba(16,24,40,.25);
+  max-height:90vh; display:flex; flex-direction:column;    /* << evita desbordes */
+}
+.u-modal-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 16px; border-bottom:1px solid #f1f5f9;
+}
+.u-modal-body{ padding:16px; overflow:auto; }               /* << scroll interno */
+.u-modal-actions{ display:flex; justify-content:flex-end; gap:8px; padding:12px 16px 16px; }
+
+/* ========= Formularios ========= */
+.u-form{ display:grid; grid-template-columns:1fr; gap:12px; }
+.u-form label{ display:grid; gap:6px; font-size:14px; color:#475569; }
+.u-form input, .u-form textarea, .u-form select{
+  border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:14px; outline:none;
+}
+.u-form input:focus, .u-form textarea:focus, .u-form select:focus{
+  border-color:#3f51b5; box-shadow:0 0 0 3px rgba(63,81,181,.12);
+}
+.u-form-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+
+/* ====== NUEVO: fieldset + grid de chips (checkboxes bonitos) ====== */
+.u-fieldset{
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  padding:12px;
+}
+.u-fieldset > legend{
+  padding:0 6px;
+  font-weight:600;
+  color:#0f172a;
+}
+
+/* Grid responsivo: 3 → 2 → 1 columnas según ancho */
+.u-chip-grid{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  gap:10px;
+  margin-top:8px;
+}
+@media (max-width:920px){ .u-chip-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+@media (max-width:520px){ .u-chip-grid{ grid-template-columns:1fr; } }
+
+/* Chip con checkbox alineado */
+.u-chip{
+  position:relative;
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px;
+  border:1px solid #e5e7eb;
+  border-radius:10px;
+  background:#fff;
+  cursor:pointer;
+  user-select:none;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.u-chip input[type="checkbox"]{
+  width:18px; height:18px; accent-color:#3f51b5; cursor:pointer;
+}
+.u-chip .u-chip-text{
+  font-size:14px; color:#0f172a; line-height:1.2;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.u-chip:hover{ border-color:#c7d2fe; background:#fafbff; box-shadow:0 0 0 3px rgba(63,81,181,.10) inset; }
+.u-chip.is-on{
+  border-color:#3f51b5; background:#eef2ff;
+  box-shadow:0 0 0 3px rgba(63,81,181,.18) inset;
+}
+
+/* ========= Toast superior ========= */
+.u-top-toast{
+  position:fixed; top:14px; left:50%; transform:translateX(-50%);
+  display:flex; align-items:center; gap:10px;
+  background:#e2e8f0; color:#0f172a; padding:10px 14px;
+  border-radius:12px; border:1px solid #cbd5e1; box-shadow:0 10px 30px rgba(2,8,20,.15);
+  z-index:2100;
+}
+.u-top-toast.success{ background:#ecfdf5; color:#065f46; border-color:#a7f3d0; }
+.u-top-toast.danger { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
+.u-top-toast__text{ font-size:14px; }
+.u-top-toast__close{ border:none; background:transparent; cursor:pointer; font-size:16px; color:inherit; }
+
+/* ========= Responsivo cabecera ========= */
+@media (max-width:640px){
+  .u-head{ flex-direction:column; align-items:stretch; }
+  .u-head-actions{ width:100%; }
+  .u-head-actions > *{ flex:1; }
+}
+
+/* ===== TABLA DE ÁREAS: anchos definitivos (sin desborde) ===== */
+.table-areas { table-layout: fixed; width: 100%; }
+
+/* Suman ~97% para dejar margen y que nada se corte */
+.table-areas col.c-no       { width: 5.5%; }  /* No.        */
+.table-areas col.c-area     { width: 17%;  }  /* Área       */
+.table-areas col.c-desc     { width: 33.5%;}  /* Descripción */
+.table-areas col.c-creado   { width: 12%;  }  /* Creado por */
+.table-areas col.c-estado   { width: 8%;   }  /* Estado     */
+.table-areas col.c-acciones { width: 21%;  }  /* Acciones   */
+
+/* Texto descripción legible y sin romper letras */
+.table-areas td:nth-child(3){
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  line-height: 1.45;
+}
+
+/* Acciones alineadas y compactas */
+.u-actions{
+  display:inline-flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
+  flex-wrap:nowrap;
+}
+.u-btn--xs{ height:30px; padding:0 6px; font-size:12px; border-radius:8px; }
+
+/* Si el espacio se reduce, prioriza que se vean todos los botones */
+@media (max-width: 960px){
+  .u-actions{ flex-wrap:wrap; }
+  .table-areas col.c-desc{ width: 32%; }
+  .table-areas col.c-acciones{ width: 22%; }
+}
+
+/* ===== TABLA DE ÁREAS: anchos definitivos (sin desborde) ===== */
+
+.table-areas { table-layout: fixed; width: 100%; }
+
+/* Rebalanceo de anchos: +Estado / -Descripción */
+.table-areas col.c-no       { width: 5.5%; }
+.table-areas col.c-area     { width: 17%;  }
+.table-areas col.c-desc     { width: 31.5%;}  /* antes 33.5% */
+.table-areas col.c-creado   { width: 12%;  }
+.table-areas col.c-estado   { width: 10.5%;}  /* antes 8% => el badge ya no se corta */
+.table-areas col.c-acciones { width: 23.5%;}  /* subimos un poco para dar aire a botones */
+
+/* Texto descripción legible y sin romper letras */
+.table-areas td:nth-child(3){
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  line-height: 1.45;
+}
+
+/* Asegurar que el badge de estado no se corte */
+.table-areas td:nth-child(5) .u-status{
+  white-space: nowrap;         /* no dividir en dos líneas */
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;             /* tamaño cómodo dentro del ancho nuevo */
+  padding: 4px 10px;
+}
+
+/* Acciones alineadas y compactas */
+.u-actions{
+  display:inline-flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
+  flex-wrap:nowrap;
+}
+.u-btn--xs{ height:30px; padding:0 6px; font-size:12px; border-radius:8px; }
+
+/* Responsivo: cuando hay menos espacio, ajustamos un poco */
+@media (max-width: 960px){
+  .u-actions{ flex-wrap:wrap; }
+  .table-areas col.c-desc{ width: 30%;  }   /* comprimimos un poco más la descripción */
+  .table-areas col.c-acciones{ width: 25%; }
+  .table-areas col.c-estado{ width: 11.5%; }/* damos un pelín más al badge en pantallas medias */
+}
+
+@media (max-width: 680px){
+  .table-areas col.c-area     { width: 22%;  }
+  .table-areas col.c-desc     { width: 26%;  }
+  .table-areas col.c-creado   { width: 13%;  }
+  .table-areas col.c-estado   { width: 13%;  } /* suficiente para “Deshabilitada” */
+  .table-areas col.c-acciones { width: 20%;  }
+}
+
+/* —— Ajuste de anchos: más espacio al Estado y Acciones —— */
+.table-areas col.c-desc     { width: 29.5%; }  /* antes ~31–33% */
+.table-areas col.c-estado   { width: 12.5%; }  /* antes 10.5% / 8% */
+.table-areas col.c-acciones { width: 22%;   }  /* un poco menos, igual cabe */
+
+/* —— Aire entre columnas Estado ↔ Acciones —— */
+.table-areas td:nth-child(5){ padding-right: 18px; } /* Estado */
+.table-areas td:nth-child(6){ padding-left:  14px; } /* Acciones */
+
+/* —— Badge que no se corta y queda centrado —— */
+.table-areas td:nth-child(5) .u-status{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  min-width: 12ch;           /* cabe "Deshabilitada" sin romper */
+  padding: 4px 12px;         /* un pelín más de aire */
+  font-size: 12px;
+}
+
+/* —— Responsivo: mantener legible en pantallas medias —— */
+@media (max-width: 960px){
+  .table-areas col.c-desc     { width: 28%; }
+  .table-areas col.c-estado   { width: 13.5%; }
+  .table-areas col.c-acciones { width: 22.5%; }
+}
+
+/* —— Más compacto en móviles —— */
+@media (max-width: 680px){
+  .table-areas col.c-area     { width: 22%;  }
+  .table-areas col.c-desc     { width: 24%;  }
+  .table-areas col.c-creado   { width: 12%;  }
+  .table-areas col.c-estado   { width: 16%;  } /* suficiente para el texto */
+  .table-areas col.c-acciones { width: 18%;  }
+  .table-areas td:nth-child(5){ padding-right: 12px; }
+  .table-areas td:nth-child(6){ padding-left:  10px; }
+}

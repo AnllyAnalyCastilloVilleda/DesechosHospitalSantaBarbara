@@ -1,0 +1,455 @@
+/* =========================
+   Página y tarjetas
+========================= */
+.u-page { padding: 24px; }
+.u-card{
+  background:#fff;
+  border-radius:24px; /* más suave como Inicio */
+  box-shadow:0 14px 40px rgba(17, 24, 39, .08);
+  padding:20px;
+  margin-bottom:18px;
+  border:1px solid rgba(99,102,241,.08);
+}
+
+/* =========================
+   Header
+========================= */
+.u-head{ display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.u-head h2{ margin:0; font-weight:800; color:#0f172a; letter-spacing:.2px; }
+.u-head-actions{ display:flex; gap:10px; align-items:center; width:60%; justify-content:flex-end; }
+
+/* =========================
+   Inputs (buscador del header)
+========================= */
+.u-input{
+  flex:1; min-width:320px;
+  padding:12px 16px;
+  border:1px solid #e5e7eb;
+  border-radius:9999px;
+  outline:none;
+  background:#fff;
+  transition: box-shadow .15s ease, border-color .15s ease, background .15s ease;
+}
+.u-input:focus{
+  border-color:#5b6cff;
+  box-shadow:0 0 0 5px rgba(91,108,255,.18);
+}
+
+/* =========================
+   Tabla
+========================= */
+.u-table{
+  width:100%;
+  border-collapse:collapse;
+  table-layout:auto;
+}
+.u-table th,.u-table td{
+  padding:12px 14px;
+  border-bottom:1px solid #f1f5f9;
+  text-align:left; font-size:14px; vertical-align:middle;
+}
+.u-table thead th{
+  color:#334155; font-weight:700;
+  background:linear-gradient(180deg,#f8fafc, #f2f6ff 85%);
+}
+.u-table tbody tr:hover{ background:#f9fbff; }
+.u-wrap{ white-space:normal; word-break:normal; overflow-wrap:break-word; }
+
+/* mínimos */
+.u-table th:nth-child(3), .u-table td:nth-child(3){ min-width:120px; }
+.u-table th:nth-child(5), .u-table td:nth-child(5){ min-width:150px; }
+
+/* Acciones */
+.th-actions{ text-align:left; }
+.col-actions{ width:200px; }
+.u-table tbody td:last-child{ padding-right:8px; }
+
+.u-row-actions{
+  display:flex; align-items:center; gap:4px; flex-wrap:nowrap;
+}
+
+/* =========================
+   Botones (base + variantes)
+========================= */
+.u-btn{
+  padding:10px 14px;
+  border-radius:9999px;
+  border:none; cursor:pointer;
+  font-weight:700; letter-spacing:.1px;
+  transition: transform .08s ease, box-shadow .2s ease, filter .15s ease;
+  will-change: transform;
+}
+.u-btn:active{ transform: translateY(1px) scale(.99); }
+.u-btn:focus-visible{ outline: none; box-shadow:0 0 0 5px rgba(99,102,241,.22); }
+
+/* Primario (como Inicio) */
+.u-btn-primary{
+  color:#fff;
+  background:linear-gradient(135deg,#5a6cff,#4765ff);
+  box-shadow:0 6px 18px rgba(71,101,255,.22);
+}
+.u-btn-primary:hover{ filter:brightness(1.02); box-shadow:0 8px 22px rgba(71,101,255,.28); }
+
+/* Claro (pill) */
+.u-btn-light{
+  color:#1e3a8a;
+  background:#eef2ff;
+}
+.u-btn-light:hover{ filter:brightness(1.02); }
+
+/* Amber/Yellow con TEXTO BLANCO (Editar) */
+.u-btn-amber,
+.u-btn-yellow{
+  color:#fff; /* <- importante: texto blanco */
+  background:linear-gradient(135deg,#f59e0b,#f4a61f);
+  box-shadow:0 6px 16px rgba(245,158,11,.22);
+}
+.u-btn-amber:hover,
+.u-btn-yellow:hover{ filter:brightness(1.02); box-shadow:0 8px 22px rgba(245,158,11,.28); }
+
+/* Azul (Correo) */
+.u-btn-blue{
+  color:#fff;
+  background:linear-gradient(135deg,#1e74ff,#2463eb);
+  box-shadow:0 6px 16px rgba(36,99,235,.22);
+}
+.u-btn-blue:hover{ filter:brightness(1.03); box-shadow:0 8px 22px rgba(36,99,235,.28); }
+
+/* Éxito / Peligro */
+.u-btn-success{
+  color:#fff;
+  background:linear-gradient(135deg,#16a34a,#22c55e);
+  box-shadow:0 6px 16px rgba(34,197,94,.22);
+}
+.u-btn-success:hover{ filter:brightness(1.03); box-shadow:0 8px 22px rgba(34,197,94,.28); }
+
+.u-btn-danger{
+  color:#fff;
+  background:linear-gradient(135deg,#ef4444,#f05252);
+  box-shadow:0 6px 16px rgba(239,68,68,.22);
+}
+.u-btn-danger:hover{ filter:brightness(1.03); box-shadow:0 8px 22px rgba(239,68,68,.28); }
+
+/* Botón con ícono (Editar/Correo) */
+.u-btn--icon{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:8px 12px;
+  line-height:1.1;
+}
+.u-btn--icon svg{ width:16px; height:16px; flex:0 0 auto; }
+
+/* Tamaño reducido */
+.u-btn--xs{
+  padding:6px 10px;
+  font-size:12px;
+  line-height:1.1;
+}
+
+/* Dos líneas (si lo vuelves a usar) */
+.u-btn--twoline{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  line-height:1.02; white-space:normal; min-width:56px; padding:4px 8px; font-size:11px;
+}
+.u-btn-line{ display:block; }
+
+/* Deshabilitado */
+.u-btn[disabled]{ opacity:.6; cursor:not-allowed; box-shadow:none; }
+
+/* =========================
+   Estado
+========================= */
+.u-status{
+  font-weight:800;
+  padding:6px 12px;
+  border-radius:9999px;
+  display:inline-block;
+  letter-spacing:.15px;
+  box-shadow: inset 0 0 0 1px rgba(15,23,42,.04);
+}
+.u-status.ok{ color:#166534; background:linear-gradient(180deg,#dcfce7,#cdf9dd); }
+.u-status.off{ color:#991b1b; background:linear-gradient(180deg,#fee2e2,#ffdcdc); }
+
+/* =========================
+   Modales
+========================= */
+.u-modal-overlay{
+  position:fixed; inset:0;
+  background:rgba(15,23,42,.35);
+  backdrop-filter: blur(6px) saturate(120%);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+  display:flex; align-items:center; justify-content:center; z-index:50; padding:16px;
+}
+.u-modal-card{
+  background:#fff; width:100%;
+  border-radius:24px;
+  box-shadow:0 20px 60px rgba(0,0,0,.2);
+  overflow:hidden;
+  display:grid; grid-template-rows:auto minmax(0,1fr);
+  max-height: calc(100dvh - 32px);
+  border:1px solid rgba(99,102,241,.08);
+}
+.u-modal-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 20px; border-bottom:1px solid #f1f5f9; background:#fff; position:sticky; top:0; z-index:1;
+}
+.u-modal-body{ padding:16px 20px; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding-bottom:max(16px, env(safe-area-inset-bottom)); }
+.u-modal-actions{ display:flex; justify-content:flex-end; gap:10px; padding:12px 20px; border-top:1px solid #f1f5f9; background:#fff; position:sticky; bottom:0; z-index:1; }
+
+/* =========================
+   Formulario en modal
+========================= */
+.u-form{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.u-form label{ display:flex; flex-direction:column; font-size:14px; gap:6px; color:#0f172a; }
+
+.u-form input, .u-form select{
+  padding:12px 14px; border-radius:9999px; border:1px solid #e5e7eb; background:#fff;
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+.u-form input:focus, .u-form select:focus{
+  border-color:#5b6cff; box-shadow:0 0 0 5px rgba(91,108,255,.18);
+}
+.u-form-actions{ grid-column:1 / -1; display:flex; justify-content:flex-end; margin-top:6px; }
+.u-form .u-input{ min-width:0; width:100%; flex:initial; }
+
+/* =========================
+   Toast superior
+========================= */
+.u-top-toast{
+  position:fixed; top:18px; left:50%; transform:translateX(-50%);
+  display:flex; align-items:center; gap:12px;
+  background:#0f172a; color:#fff; padding:12px 16px; border-radius:14px;
+  box-shadow:0 14px 40px rgba(0,0,0,.25); font-weight:700; z-index:60;
+  max-width:680px; width:auto; animation:u-slide-down .2s ease-out;
+}
+.u-top-toast.success{ background:#16a34a; }
+.u-top-toast.danger{  background:#dc2626; }
+.u-top-toast.info{    background:#334155; }
+.u-top-toast__text{ white-space:initial; }
+.u-top-toast__close{
+  border:none; background:rgba(255,255,255,.22); color:#fff;
+  border-radius:10px; padding:4px 8px; cursor:pointer;
+}
+@keyframes u-slide-down{ from{ opacity:0; transform:translate(-50%,-10px);} to{ opacity:1; transform:translate(-50%,0);} }
+
+/* =========================
+   Ayudas / validaciones
+========================= */
+.hint-muted{ font-size:12px; color:#64748b; margin-top:4px; }
+.hint-bad{ font-size:12px; color:#b91c1c; margin-top:4px; }
+.is-invalid{ border-color:#ef4444 !important; box-shadow:0 0 0 5px rgba(239,68,68,.12) !important; }
+input[aria-invalid="true"]{ border-color:#ef4444; box-shadow:0 0 0 5px rgba(239,68,68,.12); }
+.is-valid{ border-color:#16a34a !important; box-shadow:0 0 0 5px rgba(22,163,74,.12) !important; }
+
+.pwd-rules ul{ margin:6px 0 0 18px; padding:0; list-style:disc; }
+.pwd-rule{ font-size:12px; margin-top:4px; }
+.pwd-rule.ok{ color:#64748b; }
+.pwd-rule.bad{ color:#b91c1c; }
+.pwd-rule.neutral{ color:#64748b; }
+
+.match-indicator{
+  display:inline-block; margin-top:4px; font-size:12px; padding:3px 10px;
+  border-radius:9999px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;
+}
+.match-indicator.ok{ background:#dcfce7; color:#166534; border-color:#86efac; }
+.match-indicator.bad{ background:#fee2e2; color:#991b1b; border-color:#fecaca; }
+
+.u-paragraph{ margin:0; line-height:1.5; }
+.u-empty{ text-align:center; padding:18px; }
+
+/* =========================
+   Responsive
+========================= */
+@media (max-width:900px){
+  .u-form{ grid-template-columns:1fr; }
+  .u-head-actions{ width:100%; flex-wrap:wrap; }
+  .u-input{ min-width:200px; }
+}
+@media (max-width:700px){
+  .u-head{ align-items:stretch; }
+  .u-head-actions{ width:100%; display:flex; flex-wrap:wrap; gap:10px; }
+  .u-head-actions .u-input{ flex:1 1 100%; min-width:0; }
+  .u-head-actions .u-btn{
+    flex:1 1 calc(50% - 5px);
+    height:48px; display:flex; align-items:center; justify-content:center;
+    white-space:normal; line-height:1.1; font-size:15px; padding:10px 12px;
+  }
+  .u-btn-primary{ box-shadow:0 6px 16px rgba(71,101,255,.22); }
+  .u-table{ display:block; overflow-x:auto; white-space:nowrap; }
+}
+
+/* ===== Compat de estilos previos que tocamos ===== */
+.u-btn + .u-btn{ margin-left:6px; }  /* separador entre botones */
+
+/* ===== Acciones compactas dentro de la tabla ===== */
+.u-row-actions.compact .u-btn{
+  padding:4px 8px;          /* menos alto/ancho */
+  font-size:11.5px;
+  line-height:1.0;
+  box-shadow:none;          /* menos volumen en celdas */
+}
+.u-row-actions.compact .u-btn--icon{
+  gap:6px;
+  padding:4px 8px;
+}
+.u-row-actions.compact .u-btn--icon svg{
+  width:14px; height:14px;
+}
+
+/* Botones de “Editar / Correo / Desactivar” aún más finos */
+.u-row-actions.compact .u-btn-amber,
+.u-row-actions.compact .u-btn-blue,
+.u-row-actions.compact .u-btn-danger{
+  box-shadow:0 4px 10px rgba(0,0,0,.06);
+}
+
+/* Ajuste del ancho de la columna de acciones */
+.col-actions{ width: 210px; }   /* sube/baja aquí si lo necesitas */
+
+/* ===== Breakpoints extra para asegurar que SIEMPRE quepa ===== */
+@media (max-width: 1440px){
+  .u-row-actions.compact .u-btn{ padding:4px 7px; font-size:11px; }
+  .u-row-actions.compact .u-btn--icon svg{ width:13px; height:13px; }
+}
+@media (max-width: 1320px){
+  /* Modo “icon-only”: ocultamos el texto y dejamos solo el ícono */
+  .u-row-actions.compact .u-btn--icon span{ display:none; }
+  .u-row-actions.compact .u-btn--icon{ padding:6px; }   /* pill redondito */
+  .col-actions{ width: 120px; }                          /* ya no necesita tanto ancho */
+}
+
+/* ===== Icon Buttons redondos con tooltip ===== */
+.u-iconbtn{
+  width:34px; height:34px;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:none; border-radius:9999px; cursor:pointer;
+  color:#fff; background:#64748b;
+  transition: transform .08s ease, box-shadow .18s ease, filter .15s ease;
+  position:relative;
+}
+.u-iconbtn:active{ transform: translateY(1px) scale(.98); }
+.u-iconbtn:focus-visible{ outline:none; box-shadow:0 0 0 4px rgba(99,102,241,.22); }
+
+/* Colores a juego con tu paleta */
+.u-iconbtn.u-amber{
+  background:linear-gradient(135deg,#f59e0b,#f4a61f);
+  box-shadow:0 4px 12px rgba(245,158,11,.22);
+}
+.u-iconbtn.u-blue{
+  background:linear-gradient(135deg,#1e74ff,#2463eb);
+  box-shadow:0 4px 12px rgba(36,99,235,.22);
+}
+.u-iconbtn.u-danger{
+  background:linear-gradient(135deg,#ef4444,#f05252);
+  box-shadow:0 4px 12px rgba(239,68,68,.22);
+}
+.u-iconbtn.u-success{
+  background:linear-gradient(135deg,#16a34a,#22c55e);
+  box-shadow:0 4px 12px rgba(34,197,94,.22);
+}
+.u-iconbtn:hover{ filter:brightness(1.03); }
+
+/* Más compactos dentro de la tabla */
+.u-row-actions.compact .u-iconbtn{
+  width:32px; height:32px;
+  box-shadow:0 3px 8px rgba(0,0,0,.06);
+}
+
+/* Tooltip */
+.u-iconbtn[data-tip]::after{
+  content: attr(data-tip);
+  position:absolute;
+  bottom: calc(100% + 8px);
+  left:50%; transform:translateX(-50%) translateY(4px);
+  background:#0f172a; color:#fff; font-weight:700; font-size:12px;
+  padding:6px 8px; border-radius:8px; white-space:nowrap;
+  box-shadow:0 8px 18px rgba(0,0,0,.18);
+  opacity:0; pointer-events:none; transition:opacity .15s ease, transform .15s ease;
+}
+.u-iconbtn[data-tip]::before{
+  content:"";
+  position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
+  border:6px solid transparent; border-top-color:#0f172a;
+  opacity:0; transition:opacity .15s ease;
+}
+.u-iconbtn:hover::after, .u-iconbtn:focus-visible::after,
+.u-iconbtn:hover::before, .u-iconbtn:focus-visible::before{
+  opacity:1; transform:translateX(-50%) translateY(0);
+}
+
+/* Si el espacio aprieta aún más, baja a 30px */
+@media (max-width: 1400px){
+  .u-row-actions.compact .u-iconbtn{ width:30px; height:30px; }
+}
+
+/* En pantallas angostas puedes reducir el ancho de la columna */
+.col-actions{ width: 150px; } /* icon-only ocupa muy poco */
+
+/* ===== Icon Buttons RECTANGULARES (no circulares) ===== */
+.u-iconbtn{
+  /* antes: width/height iguales -> círculo */
+  height: 32px;
+  padding: 0 10px;             /* ancho viene del padding */
+  min-width: 36px;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:none; border-radius: 12px;     /* pastilla/rectangular */
+  cursor:pointer;
+  color:#fff; background:#64748b;
+  transition: transform .08s ease, box-shadow .18s ease, filter .15s ease, background .15s ease;
+  position:relative;
+}
+.u-iconbtn svg{ width:16px; height:16px; }
+.u-iconbtn:active{ transform: translateY(1px) scale(.98); }
+.u-iconbtn:focus-visible{ outline:none; box-shadow:0 0 0 4px rgba(99,102,241,.22); }
+
+/* Colores (igual que antes) */
+.u-iconbtn.u-amber{
+  background:linear-gradient(135deg,#f59e0b,#f4a61f);
+  box-shadow:0 4px 12px rgba(245,158,11,.22);
+}
+.u-iconbtn.u-blue{
+  background:linear-gradient(135deg,#1e74ff,#2463eb);
+  box-shadow:0 4px 12px rgba(36,99,235,.22);
+}
+.u-iconbtn.u-danger{
+  background:linear-gradient(135deg,#ef4444,#f05252);
+  box-shadow:0 4px 12px rgba(239,68,68,.22);
+}
+.u-iconbtn.u-success{
+  background:linear-gradient(135deg,#16a34a,#22c55e);
+  box-shadow:0 4px 12px rgba(34,197,94,.22);
+}
+.u-iconbtn:hover{ filter:brightness(1.03); }
+
+/* Más compactos dentro de la tabla */
+.u-row-actions.compact .u-iconbtn{
+  height: 30px;
+  padding: 0 8px;
+  min-width: 32px;
+  border-radius: 10px;
+  box-shadow:0 3px 8px rgba(0,0,0,.06);
+}
+.u-row-actions.compact .u-iconbtn svg{ width:15px; height:15px; }
+
+/* Tooltip (igual) */
+.u-iconbtn[data-tip]::after{
+  content: attr(data-tip);
+  position:absolute;
+  bottom: calc(100% + 8px);
+  left:50%; transform:translateX(-50%) translateY(4px);
+  background:#0f172a; color:#fff; font-weight:700; font-size:12px;
+  padding:6px 8px; border-radius:8px; white-space:nowrap;
+  box-shadow:0 8px 18px rgba(0,0,0,.18);
+  opacity:0; pointer-events:none; transition:opacity .15s ease, transform .15s ease;
+}
+.u-iconbtn[data-tip]::before{
+  content:""; position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
+  border:6px solid transparent; border-top-color:#0f172a;
+  opacity:0; transition:opacity .15s ease;
+}
+.u-iconbtn:hover::after, .u-iconbtn:focus-visible::after,
+.u-iconbtn:hover::before, .u-iconbtn:focus-visible::before{
+  opacity:1; transform:translateX(-50%) translateY(0);
+}
+
+/* Ajuste sugerido de columna (icon-only rectangular ocupa poco) */
+.col-actions{ width: 150px; }

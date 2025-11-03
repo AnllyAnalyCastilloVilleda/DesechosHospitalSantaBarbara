@@ -1,0 +1,8 @@
+{
+  "short_name": "HSB",
+  "name": "Hospital Santa Bárbara",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#2b6cb0",
+  "background_color": "#ffffff"
+}

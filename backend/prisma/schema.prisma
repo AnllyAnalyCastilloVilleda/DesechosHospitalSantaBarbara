@@ -1,0 +1,347 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext]
+}
+
+/**
+ * =========================
+ * Roles / Permisos / Usuario
+ * =========================
+ */
+model Rol {
+  id            Int             @id @default(autoincrement())
+  nombre        String          @unique @db.Citext
+  activo        Boolean         @default(true)
+  actualizadoEn DateTime        @default(now()) @updatedAt
+  creadoEn      DateTime        @default(now())
+  sistema       Boolean         @default(false)
+  permisos      PermisoPorRol[]
+  usuarios      Usuario[]
+}
+
+model Permiso {
+  id          Int             @id @default(autoincrement())
+  nombre      String          @unique @db.Citext
+  descripcion String?
+  roles       PermisoPorRol[]
+}
+
+model PermisoPorRol {
+  id        Int     @id @default(autoincrement())
+  permisoId Int
+  rolId     Int
+  permiso   Permiso @relation(fields: [permisoId], references: [id])
+  rol       Rol     @relation(fields: [rolId], references: [id])
+
+  @@unique([permisoId, rolId])
+}
+
+model Usuario {
+  id                  Int      @id @default(autoincrement())
+  nombre              String
+  usuario             String   @unique @db.Citext
+  correo              String   @unique @db.Citext
+  contrasena          String?
+  estado              Boolean  @default(true)
+  creadoEn            DateTime @default(now())
+  actualizadoEn       DateTime @updatedAt
+  debeCambiarPassword Boolean  @default(false)
+  rolId               Int
+
+  areasCreadas        Area[]
+  bolsasCreadas       Bolsa[]
+  lotesQRCreados      LoteQR[]
+  tiposDesechoCreados TipoDesecho[]
+
+  // Relaciones nombradas para evitar ambigüedad
+  registrosCreados  Registro[] @relation("RegistroCreadoPor")
+  registrosCerrados Registro[] @relation("RegistroCerradoPor")
+  etiquetasUsadas   EtiquetaQR[] @relation("EtiquetaUsadaPor")
+
+  rol Rol @relation(fields: [rolId], references: [id])
+
+  /// Política de contraseñas
+  ultimoCambioContrasena  DateTime?             @db.Timestamptz
+  contrasenaHistoriales   ContrasenaHistorial[]
+  /// Cooldown de recuperación
+  ultimoEnvioRecuperacion DateTime?             @db.Timestamptz
+
+  @@index([estado])
+  @@index([ultimoCambioContrasena])
+  @@index([debeCambiarPassword])
+  @@index([ultimoEnvioRecuperacion])
+}
+
+/**
+ * ================
+ * Catálogos
+ * ================
+ */
+model Area {
+  id            Int      @id @default(autoincrement())
+  nombre        String   @unique @db.Citext
+  descripcion   String?
+  estado        Boolean  @default(true)
+  creadoPorId   Int
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  creadoPor     Usuario         @relation(fields: [creadoPorId], references: [id])
+  EtiquetaQR    EtiquetaQR[]
+  LoteQR        LoteQR[]
+  RegistroLinea RegistroLinea[]
+
+  // M↔N configurado: tipos permitidos por área
+  tiposPermitidos AreaTipoDesecho[]
+
+  @@index([estado])
+}
+
+model TipoDesecho {
+  id            Int      @id @default(autoincrement())
+  nombre        String   @unique @db.Citext
+  /// Slug estable para reglas/reportes (COMUN, ESPECIALES, INFECCIOSOS, PATOLOGICOS, PUNZOCORTANTES…)
+  slug          String   @unique @db.Citext
+  descripcion   String?
+  estado        Boolean  @default(true)
+  creadoPorId   Int
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  creadoPor     Usuario         @relation(fields: [creadoPorId], references: [id])
+  bolsas        Bolsa[]
+  RegistroLinea RegistroLinea[]
+
+  // M↔N configurado: áreas donde este tipo está permitido
+  areasPermitidas AreaTipoDesecho[]
+
+  @@index([estado])
+}
+
+/**
+ * Tabla puente para configurar qué tipos están permitidos en cada área.
+ * Permite filtrar el combo de Tipos tras elegir un Área.
+ */
+model AreaTipoDesecho {
+  areaId        Int
+  tipoDesechoId Int
+  activo        Boolean @default(true)
+
+  area Area        @relation(fields: [areaId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  tipo TipoDesecho @relation(fields: [tipoDesechoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([areaId, tipoDesechoId])
+  @@index([tipoDesechoId])
+  @@index([areaId, activo])
+  @@index([tipoDesechoId, activo])
+}
+
+model Bolsa {
+  id          Int     @id @default(autoincrement())
+  color       String  @db.Citext
+  tamano      String
+  descripcion String?
+  estado      Boolean @default(true)
+
+  // Cada bolsa pertenece a un tipo de desecho
+  tipoDesechoId Int
+  tipoDesecho   TipoDesecho @relation(fields: [tipoDesechoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  creadoPorId   Int
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  creadoPor     Usuario         @relation(fields: [creadoPorId], references: [id])
+  EtiquetaQR    EtiquetaQR[]
+  LoteQR        LoteQR[]
+  RegistroLinea RegistroLinea[]
+
+  // Permite repetir color/tamaño entre tipos distintos
+  @@unique([tipoDesechoId, color, tamano])
+  @@index([estado])
+  @@index([tipoDesechoId])
+}
+
+/**
+ * =========================
+ * Lotes y Etiquetas QR
+ * =========================
+ */
+model LoteQR {
+  id            Int      @id @default(autoincrement())
+  areaId        Int
+  bolsaId       Int
+  cantidad      Int
+  porHoja       Int      @default(4)
+  creadoPorId   Int?
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  etiquetas EtiquetaQR[]
+  area      Area         @relation(fields: [areaId], references: [id])
+  bolsa     Bolsa        @relation(fields: [bolsaId], references: [id])
+  creadoPor Usuario?     @relation(fields: [creadoPorId], references: [id])
+
+  @@index([areaId])
+  @@index([bolsaId])
+}
+
+model EtiquetaQR {
+  id            Int       @id @default(autoincrement())
+  codigo        String    @unique @db.Citext
+  loteId        Int
+  areaId        Int
+  bolsaId       Int
+  estado        EstadoQR  @default(ACTIVA)
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+  usadoEn       DateTime?
+
+  // quién la usó (opcional)
+  usadoPorId Int?
+  usadoPor   Usuario? @relation("EtiquetaUsadaPor", fields: [usadoPorId], references: [id])
+
+  area          Area            @relation(fields: [areaId], references: [id])
+  bolsa         Bolsa           @relation(fields: [bolsaId], references: [id])
+  lote          LoteQR          @relation(fields: [loteId], references: [id])
+  RegistroLinea RegistroLinea[]
+
+  @@index([loteId])
+  @@index([estado])
+  @@index([areaId, bolsaId])
+  @@index([loteId, estado])
+  @@index([usadoPorId])
+}
+
+enum EstadoQR {
+  ACTIVA
+  USADA
+  ANULADA
+}
+
+/**
+ * =========================
+ * Registros genéricos (compat con tu tabla actual)
+ * =========================
+ * Mapeamos el modelo `Registro` a la tabla física existente `RegistroDiario`
+ * y el enum `EstadoRegistro` al enum físico `RegistroEstado`.
+ * - ABIERTO (nuevo) ↔ BORRADOR (viejo)
+ * - CERRADO (nuevo) ↔ CERRADO (viejo)
+ */
+enum EstadoRegistro {
+  ABIERTO @map("BORRADOR")
+  CERRADO @map("CERRADO")
+
+  @@map("RegistroEstado")
+}
+
+model Registro {
+  id Int @id @default(autoincrement())
+
+  /// Identificación libre
+  titulo String?
+  nota   String?
+
+  /// Trazabilidad temporal (reutilizamos columnas viejas)
+  abiertoAt     DateTime  @default(now()) @map("creadoEn") // usa columna creadaEn
+  actualizadoEn DateTime  @updatedAt // mapea a actualizadoEn (mismo nombre)
+  cerradoAt     DateTime? @map("cerradoEn")
+
+  /// Estado mapeado al enum físico existente
+  estado EstadoRegistro @default(ABIERTO) @map("estado")
+
+  /// Modo de entrada informativo
+  modoEntrada String? @map("modoEntrada")
+
+  /// Usuario que lo abrió (reutiliza `responsableId`) — relación nombrada
+  creadoPorId Int     @map("responsableId")
+  creadoPor   Usuario @relation("RegistroCreadoPor", fields: [creadoPorId], references: [id])
+
+  /// Usuario que cerró (nuevo) — relación nombrada
+  cerradoPorId Int?
+  cerradoPor   Usuario? @relation("RegistroCerradoPor", fields: [cerradoPorId], references: [id])
+
+  /// Campo LEGACY para conservar la columna física `fecha` sin borrarla
+  fechaLegacy DateTime @default(now()) @map("fecha")
+
+  /// Acumulado de peso (nuevo)
+  totalPesoLb Decimal @default(0) @db.Decimal(12, 3)
+  /// PDF generado al cerrar (nuevo)
+  pdfUrl      String?
+
+  /// Líneas capturadas
+  lineas RegistroLinea[]
+
+  @@index([estado])
+  @@index([abiertoAt])
+  @@index([creadoPorId])
+  @@index([cerradoPorId])
+  @@map("RegistroDiario") // ← usa tu tabla actual
+}
+
+model RegistroLinea {
+  id Int @id @default(autoincrement())
+
+  /// Relación con el registro (FK física a RegistroDiario.id)
+  registroId Int
+  registro   Registro @relation(fields: [registroId], references: [id], onDelete: Cascade)
+
+  /// Si se escanea una etiqueta QR, se guarda; si es manual, puede ser NULL y se guarda `codigo`.
+  etiquetaId Int?
+  etiqueta   EtiquetaQR? @relation(fields: [etiquetaId], references: [id])
+
+  /// Código manual cuando no hay etiqueta (opcional, informativo)
+  codigo String?
+
+  /// Hora puntual de la línea
+  hora DateTime @default(now())
+
+  areaId Int
+  area   Area @relation(fields: [areaId], references: [id])
+
+  bolsaId Int
+  bolsa   Bolsa @relation(fields: [bolsaId], references: [id])
+
+  /// Se guarda explícitamente el tipo de desecho
+  tipoDesechoId Int
+  tipoDesecho   TipoDesecho @relation(fields: [tipoDesechoId], references: [id])
+
+  /// Libras con 3 decimales
+  pesoLb Decimal @db.Decimal(10, 3)
+
+  creadoEn DateTime @default(now())
+
+  /// 🔐 Anti-duplicados
+  /// 1) Compat: evita repetir la misma etiqueta dentro del mismo registro
+  @@unique([registroId, etiquetaId])
+  /// 2) **Regla global**: una etiqueta sólo puede usarse una vez en toda la historia
+  @@unique([etiquetaId], name: "uniq_linea_por_etiqueta")
+
+  @@index([registroId])
+  @@index([etiquetaId])
+  @@index([areaId])
+  @@index([bolsaId])
+  @@index([tipoDesechoId])
+  @@index([hora])
+}
+
+/**
+ * =========================
+ * Seguridad: Historial de contraseñas
+ * =========================
+ */
+model ContrasenaHistorial {
+  id        Int      @id @default(autoincrement())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId Int
+  hash      String
+  creadoEn  DateTime @default(now())
+
+  @@index([usuarioId, creadoEn])
+}

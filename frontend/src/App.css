@@ -1,0 +1,244 @@
+/* ========== APP (Dashboard general) ========== */
+:root{
+  --bg1:#4f7cff; --bg2:#6c63ff;
+  --text:#1b2b52; --muted:#6c7b97; --primary:#3557ff;
+  --ring:rgba(53,87,255,.18); --card:#fff;
+
+  /* Anchos del shell y la sidebar */
+  --shell-w: clamp(1050px, 94vw, 1320px);
+  --sb-w: 300px;
+}
+
+*{ box-sizing: border-box }
+html, body{
+  margin:0; padding:0; background:#eef3ff; color:var(--text);
+  font-family: Segoe UI, Roboto, Arial, sans-serif;
+  font-size: 15.5px;
+  overflow-x:hidden;
+}
+
+/* ===== Shell general ===== */
+.dashboard-shell{ min-height:100vh }
+
+/* ===== TOPBAR ===== */
+.topbar{
+  position: sticky; top:0; z-index: 40;
+  background: linear-gradient(135deg, var(--bg1), var(--bg2));
+  color:#fff;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 16px;
+  box-shadow: 0 6px 18px rgba(60,80,180,.25);
+}
+.topbar .topbar-left{
+  display:flex; align-items:center; gap:12px;
+}
+.topbar-brand{ display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.2px }
+.topbar-brand img{ width:28px; height:28px; border-radius:8px; background:#fff; padding:3px }
+.topbar-actions{ display:flex; align-items:center; gap:10px }
+.topbar-user{ opacity:.95 }
+.btn-logout{
+  background:#fff; color:var(--text);
+  border:1px solid #e5eaff; border-radius:10px;
+  padding:8px 12px; cursor:pointer;
+  box-shadow: 0 6px 16px rgba(20,35,70,.12);
+}
+.btn-logout:hover{ box-shadow: 0 9px 20px rgba(20,35,70,.16) }
+
+/* ===== LAYOUT: Sidebar fija + Contenido ===== */
+.app-layout{
+  max-width: var(--shell-w); margin: 12px auto;
+  display: grid; gap: 14px;
+  grid-template-columns: var(--sb-w) 1fr;
+  padding: 0 14px 14px;
+}
+.sidebar{
+  background:#fff; border:1px solid #eef2ff; border-radius:14px;
+  box-shadow: 0 10px 22px rgba(20,35,70,.10);
+  height: fit-content; position: sticky; top: 76px;
+  overflow: hidden; z-index: 5;
+}
+.side-nav{ display:flex; flex-direction: column; padding: 10px; gap:6px }
+.nav-item{
+  position: relative;
+  display:flex; align-items:center; gap:10px;
+  width:100%; padding:11px 13px; margin:4px 0;
+  background:#fff; border:1px solid transparent; border-radius:12px;
+  color:#2a386d; font-weight:600; cursor:pointer;
+  transition: background .15s ease, transform .06s ease, border-color .15s ease;
+  font-size:15px;
+}
+.nav-item:hover{ background:#f7f9ff; border-color:#e7ecff; transform: translateY(-1px) }
+.nav-item.active{
+  background: linear-gradient(180deg, #5b78ff, #3557ff); color:#fff;
+  border-color: transparent; box-shadow: 0 10px 22px rgba(53,87,255,.25);
+}
+.nav-item.active::before{
+  content:""; position:absolute; left:6px; top:8px; bottom:8px;
+  width:4px; border-radius:4px; background:#ffffffcc;
+}
+.nav-ico{ width:22px; text-align:center }
+
+/* Contenido */
+.main-content{ min-width: 0 }
+.contenido{
+  background:#fff; border:1px solid #eef2ff; border-radius:14px;
+  box-shadow:0 8px 20px rgba(20,35,70,.08);
+  padding: 14px;
+}
+/* Quitar marco solo en Inicio */
+.inicio-page .contenido{
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* ===== PACK COMPACTO DE SIDEBAR ===== */
+:root{
+  --sb-w: 248px;
+  --shell-w: clamp(1120px, 98vw, 1500px);
+}
+.side-nav{ padding:8px; gap:4px; }
+.nav-item{ padding:9px 11px; font-size:14.25px; border-radius:12px; }
+.nav-ico{ width:20px; }
+.app-layout{ gap:12px; }
+.nav-item.active::before{ left:4px; top:6px; bottom:6px; width:3px; border-radius:3px; }
+
+/* ===== MENÚ MÓVIL ===== */
+.mobile-menu-trigger {
+  display:none;
+  margin-left:auto; margin-right:12px;
+  background:#fff; border:1px solid #e5e7eb; border-radius:12px;
+  padding:8px 12px; font-weight:800; color:#1b2b52;
+  box-shadow:0 6px 16px rgba(0,0,0,.06);
+}
+.mobile-menu-trigger.open{ background:#f8fafc; }
+
+.overlay-backdrop {
+  position:fixed; inset:0;
+  background:rgba(16,24,40,.45);
+  backdrop-filter:blur(2px);
+  z-index:999;
+}
+.overlay-panel {
+  position:fixed; top:0; left:0; bottom:0;
+  width:min(86vw, 360px);
+  background:#fff; box-shadow:12px 0 30px rgba(0,0,0,.18);
+  z-index:1000;
+  display:flex; flex-direction:column;
+  transform:translateX(-8px);
+  animation:slideIn .18s ease-out;
+  border-top-right-radius:14px; border-bottom-right-radius:14px;
+}
+@keyframes slideIn {
+  from{ opacity:0; transform:translateX(-40px); }
+  to{ opacity:1; transform:translateX(-8px); }
+}
+.overlay-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 16px; border-bottom:1px solid #eef2f7;
+  font-weight:800; color:#1b2b52;
+}
+.overlay-close{ background:transparent; border:0; font-size:18px; cursor:pointer; }
+.overlay-list{ padding:6px 8px 12px; overflow-y:auto; }
+.overlay-list button{
+  width:100%; text-align:left; border:0; background:transparent;
+  padding:12px 12px; border-radius:10px;
+  display:flex; gap:10px; align-items:center;
+  font-weight:600; color:#1b2b52;
+}
+.overlay-list button:hover{ background:#f8fafc; }
+.overlay-list button.active{ background:#eff6ff; }
+.overlay-list .ico{ width:22px; display:inline-flex; }
+
+/* ===== BOTÓN HAMBURGUESA EN TOPBAR ===== */
+.mobile-fab-hamb{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:44px; height:44px;
+  border-radius:12px; border:1px solid #e5e7eb;
+  background:#fff; color:#1b2b52;
+  box-shadow:0 6px 16px rgba(0,0,0,.06);
+}
+.mobile-fab-hamb.open{ background:#f8fafc; }
+.mobile-fab-hamb.in-topbar{
+  position:relative; inset:auto; margin:0;
+  box-shadow:none; border-radius:10px;
+  width:40px; height:40px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width:1024px){
+  .app-layout{ grid-template-columns:1fr; }
+  .sidebar{
+    position:static; width:auto; max-width:none; height:auto; border-radius:12px;
+  }
+  .side-nav{ flex-direction:row; gap:8px; padding:8px; overflow-x:auto; scrollbar-width:thin; }
+  .nav-item{ flex:0 0 auto; }
+}
+@media (max-width:768px){
+  .sidebar{ display:none; }
+  .mobile-menu-trigger{ display:inline-flex; }
+  .app-layout{ grid-template-columns:1fr !important; }
+  .main-content{ padding:0 16px 20px; }
+}
+@media (max-width:520px){
+  .btn-logout{ padding:6px 10px }
+  .topbar-brand span{ display:none }
+}
+
+/* ===== Header compacto en móvil (<= 520px) ===== */
+@media (max-width:520px){
+
+  /* Distribución: [hamburguesa] [logo+saludo] [cerrar] */
+  .topbar{
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    align-items:center;
+    gap:10px;
+    padding:8px 12px;
+  }
+
+  /* Logo: mismo tamaño que el botón (36px de alto) */
+  .topbar-brand img{
+    width:36px;
+    height:36px;
+    border-radius:10px;
+    background:#fff;
+    padding:3px;
+    box-shadow:0 3px 10px rgba(0,0,0,.08);
+  }
+
+  /* Texto de marca oculto (ya lo tienes oculto) */
+  .topbar-brand span{ display:none; }
+
+  /* Saludo más proporcionado */
+  .topbar-user{
+    font-size:.92rem;
+    line-height:1.1;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  /* Botón Cerrar sesión MÁS pequeño y de 36px de alto */
+  .btn-logout{
+    font-size:.78rem !important;   /* letra más chica */
+    padding:4px 8px !important;    /* menos padding */
+    line-height:1.05;
+    min-height:36px;               /* igual al logo */
+    border-radius:10px;
+    box-shadow:0 4px 12px rgba(20,35,70,.10);
+  }
+
+  /* Icono dentro del botón también pequeño */
+  .btn-logout svg,
+  .btn-logout img{
+    width:14px; height:14px;
+    margin-right:6px;
+  }
+
+  /* Ajustes finos del grupo derecho */
+  .topbar-actions{ gap:8px; }
+}
