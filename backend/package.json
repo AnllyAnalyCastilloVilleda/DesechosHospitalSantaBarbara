@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
+    "prestart": "prisma migrate deploy",
     "postinstall": "prisma generate",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate",
