@@ -5,6 +5,7 @@ import "./Usuarios.css"; // para .is-invalid/.is-valid/.hint-bad
 import Avatar3D from "./ui/Avatar3D";
 import http from "./config/api";
 
+
 const emailOk = (v = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim());
 
 /* ---------------- Modal ligero (responsive / bottom-sheet en móvil) ---------------- */
