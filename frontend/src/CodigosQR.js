@@ -1,5 +1,5 @@
 // src/CodigosQR.js
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
 import api from "./config/api";
@@ -125,12 +125,9 @@ export default function CodigosQR() {
 
         setTipos(tiposActivos);
 
-        // Seleccionar primer tipo permitido y ajustar bolsa
+        // Seleccionar primer tipo permitido; la bolsa válida la ajusta el otro effect ([tipoId, bolsas])
         if (tiposActivos.length) {
-          const firstTipo = Number(tiposActivos[0].id);
-          setTipoId(firstTipo);
-          const firstBolsa = bolsas.find((b) => Number(b.tipoDesechoId) === Number(firstTipo));
-          setBolsaId(firstBolsa ? Number(firstBolsa.id) : "");
+          setTipoId(Number(tiposActivos[0].id));
         } else {
           setTipoId("");
           setBolsaId("");
@@ -147,7 +144,6 @@ export default function CodigosQR() {
     })();
 
     return () => { cancel = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [areaId]);
 
   /* =========================
@@ -165,7 +161,7 @@ export default function CodigosQR() {
   /* =========================
      Historial
      ========================= */
-  const cargarLotes = async (p = 1) => {
+  const cargarLotes = useCallback(async (p = 1) => {
     try {
       setCargandoLotes(true);
       const params = { page: p, pageSize };
@@ -182,8 +178,9 @@ export default function CodigosQR() {
     } finally {
       setCargandoLotes(false);
     }
-  };
-  useEffect(() => { cargarLotes(1); }, [filtroAreaId, filtroBolsaId]);
+  }, [filtroAreaId, filtroBolsaId, pageSize]);
+
+  useEffect(() => { cargarLotes(1); }, [cargarLotes]);
 
   const irA = (p) => {
     const pg = Math.min(Math.max(1, p), totalPages);

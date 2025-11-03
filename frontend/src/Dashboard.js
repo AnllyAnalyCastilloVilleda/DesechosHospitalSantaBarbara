@@ -1,5 +1,5 @@
 // src/App.js (Dashboard)
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import "./App.css";
 
 import Usuario from "./Usuarios";
@@ -55,10 +55,14 @@ export default function Dashboard() {
     ["Administrador", "Superadministrador", "Admin", "Root"].includes(rolStr) ||
     [0, 1, 99].includes(Number(rolId));
 
-  const can = (perm) => {
-    if (ADMIN_BYPASS && isAdminLike) return true;
-    return permisosSet.has(perm);
-  };
+  // ✅ can() estable para no disparar el warning en NAV_ITEMS
+  const can = useCallback(
+    (perm) => {
+      if (ADMIN_BYPASS && isAdminLike) return true;
+      return permisosSet.has(perm);
+    },
+    [isAdminLike, permisosSet]
+  );
 
   // Si cambias permisos desde Roles, puedes querer refrescar para volver a consultar /auth/me
   const handleUsuarioPermisosChange = () => {
@@ -79,8 +83,7 @@ export default function Dashboard() {
       ...(can("CODIGOS_QR") ? [{ id: "qrs", label: "Códigos QR", icon: "📷" }] : []),
       ...(can("ESTADISTICAS") ? [{ id: "estadisticas", label: "Estadísticas", icon: "📊" }] : []),
     ],
-    // Dependencias: si cambian los permisos o el "modo admin", recalculamos
-    [permisosSet, isAdminLike]
+    [can]
   );
 
   const cambiarVista = (id) => setVista(id);

@@ -1,12 +1,7 @@
 // src/Roles.js
 import React, { useEffect, useMemo, useState } from "react";
+import api from "./config/api"; // ⬅️ usa tu cliente axios con token
 import "./Roles.css";
-
-// Usa variable de entorno si existe; si no, arma http://<host-actual>:5000
-const API =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
-  process.env.REACT_APP_API_URL ||
-  `${window.location.protocol}//${window.location.hostname}:5000`;
 
 /* ================= Modal compacto y bonito (frontend) ================= */
 function Modal({
@@ -175,26 +170,15 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
   const [creandoNuevo, setCreandoNuevo] = useState(false);
   const [nuevoRol, setNuevoRol] = useState("");
 
-  const token = localStorage.getItem("token");
-  const authed = (init = {}) => ({
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers || {}),
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
   const esSuperadmin = rolSeleccionado?.nombre === "Superadmin";
   const esAdmin = rolSeleccionado?.nombre === "Administrador";
   const PERMISOS_BLOQUEADOS_ADMIN = new Set(["USUARIOS", "ROLES"]);
-
   const ROLES_BLOQUEADOS = new Set(["Superadmin", "Administrador", "Recolector", "Estadístico"]);
 
-  // >>> Predeterminados actualizados (Recolector con 5 permisos)
+  // Predeterminados (Recolector con 5 permisos)
   const PERMISOS_PREDETERMINADOS = {
     Administrador: () => (permisos || []).map((p) => p.nombre),
-    "Estadístico": () => (permisos || []).filter((p) => ["ESTADISTICAS"].includes(p.nombre)).map((p) => p.nombre),
+    Estadístico: () => (permisos || []).filter((p) => ["ESTADISTICAS"].includes(p.nombre)).map((p) => p.nombre),
     Recolector:   () =>
       (permisos || [])
         .filter((p) =>
@@ -207,16 +191,20 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
   const cargar = async () => {
     setCargando(true);
     try {
-      // Traemos TODOS los roles con permisos y _count.usuarios (asignados)
-      const [rolesFull, permsResp] = await Promise.all([
-        fetch(`${API}/roles/full`, authed()).then((r) => r.json()),
-        fetch(`${API}/permisos`, authed()).then((r) => r.json()),
+      const [rolesFullRes, permsRes] = await Promise.all([
+        api.get("/roles/full"),
+        api.get("/permisos"),
       ]);
 
-      const rolesArr = Array.isArray(rolesFull) ? rolesFull : [];
+      // Normaliza roles: asignados desde _count.usuarios si llega
+      const rolesFull = Array.isArray(rolesFullRes.data) ? rolesFullRes.data : [];
+      const rolesArr = rolesFull.map((r) => ({
+        ...r,
+        asignados: r.asignados ?? r._count?.usuarios ?? 0,
+      }));
 
-      // Filtra BALANZA y ordena para que ESTADISTICAS quede al final
-      const permsArr = Array.isArray(permsResp) ? permsResp : [];
+      // Filtra BALANZA y ordena con ESTADISTICAS al final
+      const permsArr = Array.isArray(permsRes.data) ? permsRes.data : [];
       const order = [
         "USUARIOS",
         "ROLES",
@@ -225,7 +213,7 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
         "TIPOS_DESECHO",
         "REGISTRO_DIARIO",
         "CODIGOS_QR",
-        "ESTADISTICAS", // explícitamente al final
+        "ESTADISTICAS", // al final
       ];
       const filteredOrdered = permsArr
         .filter((p) => p?.nombre !== "BALANZA")
@@ -241,13 +229,13 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
       setRolesOff(rolesArr.filter((r) => !r.activo));
       setPermisos(filteredOrdered);
 
-      // mapa de permisos por rol (vienen como nombres en /roles/full)
+      // mapa de permisos por rol (array de nombres)
       const mapa = {};
       rolesArr.forEach((r) => { mapa[r.id] = Array.isArray(r.permisos) ? r.permisos : []; });
       setPermisosAsignados(mapa);
 
       const firstActive = rolesArr.find((r) => r.activo);
-      setRolSeleccionado(firstActive || null);
+      setRolSeleccionado((prev) => prev ?? firstActive ?? null);
     } catch (e) {
       console.error("Error cargando roles/permisos:", e);
       setToast({ text: "Error cargando datos de roles (verifica token).", type: "danger" });
@@ -256,18 +244,20 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
     }
   };
 
-  useEffect(() => { cargar(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { cargar(); }, []);
 
   useEffect(() => {
     if (!rolSeleccionado) return;
+    // Si el rol no tiene permisos aún, aplicar predeterminados (si aplica)
+    const actual = permisosAsignados[rolSeleccionado.id] || [];
     const getDefaults = PERMISOS_PREDETERMINADOS[rolSeleccionado.nombre];
-    if (typeof getDefaults === "function") {
+    if (Array.isArray(actual) && actual.length === 0 && typeof getDefaults === "function") {
       setPermisosAsignados((prev) => ({
         ...prev,
         [rolSeleccionado.id]: getDefaults(),
       }));
     }
-  }, [rolSeleccionado, permisos]);
+  }, [rolSeleccionado, permisos]); // eslint-disable-line
 
   // ---------- Utilidades UI ----------
   const permisosCol = useMemo(() => {
@@ -301,7 +291,7 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
     const rid = rolSeleccionado.id;
     setPermisosAsignados((prev) => ({
       ...prev,
-      [rid]: (permisos || []).map((p) => p.nombre), // `permisos` ya viene sin BALANZA y ordenado
+      [rid]: (permisos || []).map((p) => p.nombre), // ya sin BALANZA y ordenado
     }));
   };
 
@@ -325,8 +315,7 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
     const n = (nombre || "").trim();
     if (!n) return;
     try {
-      const res = await fetch(`${API}/roles`, authed({ method: "POST", body: JSON.stringify({ nombre: n }) }));
-      if (!res.ok) throw new Error("Error creando rol");
+      await api.post("/roles", { nombre: n });
       setToast({ text: "Rol creado.", type: "success" });
       await cargar();
     } catch (e) {
@@ -337,8 +326,7 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
 
   const renombrarRol = async (id, nombre) => {
     try {
-      const res = await fetch(`${API}/roles/${id}`, authed({ method: "PATCH", body: JSON.stringify({ nombre }) }));
-      if (!res.ok) throw new Error();
+      await api.patch(`/roles/${id}`, { nombre });
       setToast({ text: "Rol renombrado.", type: "success" });
       await cargar();
     } catch {
@@ -347,10 +335,9 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
   };
 
   const disableRol = async (id) => {
-    const res = await fetch(`${API}/roles/${id}/disable`, authed({ method: "PATCH" }));
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      throw new Error(j?.mensaje || "No se pudo deshabilitar el rol");
+    const res = await api.patch(`/roles/${id}/disable`);
+    if (res.status < 200 || res.status >= 300) {
+      throw new Error(res.data?.mensaje || "No se pudo deshabilitar el rol");
     }
     setToast({ text: "Rol deshabilitado.", type: "success" });
     await cargar();
@@ -358,8 +345,7 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
 
   const enableRol  = async (id) => {
     try {
-      const res = await fetch(`${API}/roles/${id}/enable`,  authed({ method: "PATCH" }));
-      if (!res.ok) throw new Error();
+      await api.patch(`/roles/${id}/enable`);
       setToast({ text: "Rol activado.", type: "success" });
       await cargar();
     } catch {
@@ -369,8 +355,8 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
 
   const eliminarRol = async (id) => {
     try {
-      const res = await fetch(`${API}/roles/${id}`, authed({ method: "DELETE" }));
-      if (!res.ok && res.status !== 204) throw new Error();
+      const res = await api.delete(`/roles/${id}`);
+      if (res.status !== 204 && (res.status < 200 || res.status >= 300)) throw new Error();
       setToast({ text: "Rol eliminado.", type: "success" });
       await cargar();
     } catch {
@@ -393,14 +379,10 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
         lista = Array.from(setCrit);
       }
 
-      const res = await fetch(
-        `${API}/roles/${rolSeleccionado.id}/permisos`,
-        authed({ method: "POST", body: JSON.stringify({ permisos: lista }) })
-      );
-      if (!res.ok) throw new Error("Error guardando permisos");
+      await api.post(`/roles/${rolSeleccionado.id}/permisos`, { permisos: lista });
       setToast({ text: "Permisos guardados.", type: "success" });
 
-      // 🔄 Si el rol editado es el del usuario actual, actualizamos local y recargamos
+      // 🔄 Si el rol editado es el del usuario actual, refrescamos sesión/UI
       const userRoleId = usuario?.rolId ?? usuario?.rol_id ?? null;
       const afectaUsuarioActual = userRoleId && rolSeleccionado?.id === userRoleId;
 
@@ -410,11 +392,9 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
           u.permisos = lista;
           localStorage.setItem("usuario", JSON.stringify(u));
         } catch {}
-        // Notificar al padre si mandó callback
         if (typeof onUsuarioPermisosChange === "function") {
           onUsuarioPermisosChange(lista);
         }
-        // Refrescar para que el AuthProvider haga /auth/me y el menú cambie ya
         setToast({ text: "Permisos guardados. Actualizando tu sesión…", type: "success" });
         setTimeout(() => window.location.reload(), 650);
       }
@@ -700,7 +680,7 @@ export default function Roles({ usuario, onUsuarioPermisosChange }) {
                           Crear nuevo rol
                         </button>
                       ) : (
-                        // *** NUEVO: fila responsiva para crear rol ***
+                        // Fila para crear rol
                         <div className="new-role-row">
                           <input
                             className="form-control form-control-sm"

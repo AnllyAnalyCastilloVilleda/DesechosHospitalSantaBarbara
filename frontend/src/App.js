@@ -8,19 +8,20 @@ import Registro from "./Registro";
 import Dashboard from "./Dashboard";
 import Recuperar from "./Recuperar";
 
-// Hook simple de auth leyendo localStorage
+// Hook simple de auth leyendo/sincronizando localStorage
 function useAuth() {
   const [usuario, setUsuario] = useState(() => {
     try { return JSON.parse(localStorage.getItem("usuario") || "null"); }
     catch { return null; }
   });
-  const token = localStorage.getItem("token");
+  const [token, setToken] = useState(() => localStorage.getItem("token"));
 
   // Sincroniza si cambia localStorage en otra pestaña
   useEffect(() => {
     const onStorage = () => {
       try { setUsuario(JSON.parse(localStorage.getItem("usuario") || "null")); }
       catch { setUsuario(null); }
+      setToken(localStorage.getItem("token"));
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -30,14 +31,14 @@ function useAuth() {
     localStorage.removeItem("usuario");
     localStorage.removeItem("token");
     setUsuario(null);
+    setToken(null);
   };
 
   return { usuario, token, setUsuario, cerrarSesion };
 }
 
-// Ruta protegida: solo deja pasar si hay token
-function Protected({ children }) {
-  const token = localStorage.getItem("token");
+// Ruta protegida: solo deja pasar si hay token (recibido por props)
+function Protected({ children, token }) {
   return token ? children : <Navigate to="/" replace />;
 }
 
@@ -77,7 +78,7 @@ export default function App() {
         <Route
           path="/inicio"
           element={
-            <Protected>
+            <Protected token={token}>
               <InicioWrapper usuario={usuario} cerrarSesion={cerrarSesion} />
             </Protected>
           }
@@ -87,7 +88,7 @@ export default function App() {
         <Route
           path="/registro"
           element={
-            <Protected>
+            <Protected token={token}>
               <RegistroWrapper />
             </Protected>
           }

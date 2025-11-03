@@ -3,8 +3,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import "./login.css";
 import "./Usuarios.css"; // para .is-invalid/.is-valid/.hint-bad
 import Avatar3D from "./ui/Avatar3D";
-import http from "./config/api";
-
+import { http } from "./config/api"; // ✅ consistente con el resto
 
 const emailOk = (v = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim());
 
@@ -180,6 +179,7 @@ function PasswordField({
   className = "",
   ariaInvalid = false,
   leftIcon = null,
+  onCapsChange, // ✅ avisa si CapsLock está activo
 }) {
   const [show, setShow] = useState(false);
 
@@ -225,6 +225,12 @@ function PasswordField({
     pointerEvents: "none",
   };
 
+  const handleKeyUp = (e) => {
+    if (typeof onCapsChange === "function" && e?.getModifierState) {
+      onCapsChange(e.getModifierState("CapsLock"));
+    }
+  };
+
   return (
     <div style={wrapper} className="input-wrap">
       {leftIcon ? <span className="input-icon" style={left}>{leftIcon}</span> : null}
@@ -234,6 +240,7 @@ function PasswordField({
         className={`input ${className}`}
         value={value}
         onChange={onChange}
+        onKeyUp={handleKeyUp}
         autoComplete={autoComplete}
         placeholder={placeholder}
         title={title}
@@ -300,6 +307,7 @@ export default function Login() {
   const [contrasena, setContrasena] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [caps, setCaps] = useState(false); // ✅ aviso CapsLock
 
   // Estado de cambio de contraseña (primera vez)
   const [pwDialog, setPwDialog] = useState({ open: false, usuarioId: null, usuario: "" });
@@ -379,7 +387,6 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Nuevo endpoint unificado
       const resp = await http.post("/usuarios/login", { usuario, contrasena });
 
       // éxito normal: { ok:true, token, usuario }
@@ -542,7 +549,9 @@ export default function Login() {
               title="Por seguridad, escribe la contraseña (pegar está deshabilitado)."
               secure
               leftIcon={<IconLock />}
+              onCapsChange={setCaps}
             />
+            {caps && <div className="hint-muted" style={{ marginTop: 6 }}>Bloq Mayús activado.</div>}
 
             {msg && <div className="alert" role="alert">{msg}</div>}
 
@@ -583,6 +592,7 @@ export default function Login() {
               title="Escribe la contraseña temporal (pegar está deshabilitado)."
               secure
               leftIcon={<IconLock />}
+              onCapsChange={() => {}}
             />
           </label>
 
@@ -598,6 +608,7 @@ export default function Login() {
               className={mismatch && nueva ? "is-invalid" : (match && confirm ? "is-valid" : "")}
               ariaInvalid={mismatch && !!nueva && !!confirm}
               leftIcon={<IconLock />}
+              onCapsChange={() => {}}
             />
           </label>
 
@@ -643,6 +654,7 @@ export default function Login() {
               className={mismatch ? "is-invalid" : (match && confirm ? "is-valid" : "")}
               ariaInvalid={mismatch}
               leftIcon={<IconLock />}
+              onCapsChange={() => {}}
             />
             {mismatch
               ? <div className="hint-bad">Las contraseñas no coinciden.</div>

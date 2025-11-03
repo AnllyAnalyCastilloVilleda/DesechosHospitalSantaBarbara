@@ -1,10 +1,21 @@
+// src/TiposDesecho.jsx
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
-import { http as api } from "./config/api";
+import api from "./config/api";
 import "./TiposDesecho.css";
 
 function Portal({ children }) {
   return ReactDOM.createPortal(children, document.body);
+}
+
+/* --- pequeño hook para debounce --- */
+function useDebounced(value, delay = 350) {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setV(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return v;
 }
 
 /* ========= ConfirmDialog (idéntico al de Áreas) ========= */
@@ -58,17 +69,25 @@ export default function TiposDesecho() {
 
   // Search
   const [q, setQ] = useState("");
+  const debQ = useDebounced(q, 350);
+
+  // bloqueo de scroll cuando modal abierto
+  useEffect(() => {
+    if (modalOpen) document.body.classList.add("no-scroll");
+    else document.body.classList.remove("no-scroll");
+    return () => document.body.classList.remove("no-scroll");
+  }, [modalOpen]);
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showDisabled]);
+  }, [showDisabled, debQ]);
 
   const load = async () => {
     try {
       setLoading(true);
       const params = {
-        ...(q ? { q } : {}),
+        ...(debQ ? { q: debQ } : {}),
         estado: showDisabled ? "eliminados" : "activos",
       };
       const { data } = await api.get("/tipos-desecho", { params });
@@ -207,7 +226,6 @@ export default function TiposDesecho() {
             placeholder={`Buscar tipos ${showDisabled ? "deshabilitados" : "activos"}...`}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && load()}
             aria-label="Buscar tipo de desecho"
           />
           <button
@@ -347,7 +365,11 @@ export default function TiposDesecho() {
       )}
 
       {/* Confirmaciones */}
-      <ConfirmDialog {...confirm} />
+      {confirm.open && (
+        <Portal>
+          <ConfirmDialog {...confirm} />
+        </Portal>
+      )}
     </div>
   );
 }

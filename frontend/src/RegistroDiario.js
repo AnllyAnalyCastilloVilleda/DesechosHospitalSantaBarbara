@@ -64,7 +64,7 @@ function ReportModal({ open, onClose, defaultDateISO, openRegistroId, onClosed }
   const [fechaISO] = useState(defaultDateISO || localISO());
   const zoneRef = useRef(null);
 
-  const waitFor = (predicate, timeoutMs = 5000, step = 150) =>
+  const waitFor = useCallback((predicate, timeoutMs = 5000, step = 150) =>
     new Promise(resolve => {
       const t0 = Date.now();
       const loop = () => {
@@ -74,25 +74,25 @@ function ReportModal({ open, onClose, defaultDateISO, openRegistroId, onClosed }
         setTimeout(loop, step);
       };
       loop();
-    });
+    }), []);
 
-  const blobToDataURL = (blob) =>
+  const blobToDataURL = useCallback((blob) =>
     new Promise((resolve, reject) => {
       const r = new FileReader();
       r.onload = () => resolve(r.result);
       r.onerror = reject;
       r.readAsDataURL(blob);
-    });
+    }), []);
 
-  const downloadBlob = (blob, filename) => {
+  const downloadBlob = useCallback((blob, filename) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
-  };
+  }, []);
 
-  const postMultipartOrBase64 = async (blob, filename) => {
+  const postMultipartOrBase64 = useCallback(async (blob, filename) => {
     try {
       const fd = new FormData();
       fd.append("file", blob, filename);
@@ -117,7 +117,7 @@ function ReportModal({ open, onClose, defaultDateISO, openRegistroId, onClosed }
       }
       return { ok: false, error: err };
     }
-  };
+  }, [blobToDataURL, openRegistroId]);
 
   const exportarPDF = useCallback(async () => {
     try {
@@ -186,7 +186,7 @@ function ReportModal({ open, onClose, defaultDateISO, openRegistroId, onClosed }
     } catch (e) {
       onClosed?.(openRegistroId || 0, null, e, null);
     }
-  }, [fechaISO, openRegistroId, onClosed]);
+  }, [downloadBlob, fechaISO, onClosed, openRegistroId, postMultipartOrBase64, waitFor]);
 
   useEffect(() => {
     if (!open) return;
@@ -273,7 +273,12 @@ export default function RegistroDiario() {
   }, []);
   const closeAlert = (id) => setAlerts(a => a.filter(x => x.id !== id));
 
-  const focusScanner = () => { if (scanRef.current){ scanRef.current.value=""; scanRef.current.focus(); } };
+  const focusScanner = useCallback(() => {
+    if (scanRef.current){
+      scanRef.current.value="";
+      scanRef.current.focus();
+    }
+  }, []);
 
   /* ===== Carga inicial ===== */
   useEffect(() => {
@@ -285,7 +290,7 @@ export default function RegistroDiario() {
         pushAlert("danger", e?.response?.data?.mensaje || "No se pudo cargar el usuario");
       } finally { focusScanner(); }
     })();
-  }, [pushAlert]);
+  }, [pushAlert, focusScanner]);
 
   // Cargar items (SOLO registro ABIERTO)
   const cargarLista = useCallback(async () => {
@@ -408,7 +413,6 @@ export default function RegistroDiario() {
   const forcePrint = async () => {
     try {
       await api.post("/scale/print", { sequence: ["P\\r\\n", "ENQ", "ESC_P"] });
-      pushAlert("info", "PRINT enviado.");
     } catch (e) {
       pushAlert("danger", "El backend no expone /scale/print o la báscula no lo soporta. Usa el botón físico (papel) o activa Auto Print.");
     }
@@ -440,7 +444,7 @@ export default function RegistroDiario() {
   }, [cargarLista]);
 
   /* ===== Recargar lista (manual) ===== */
-  const recargarLista = async () => {
+  const recargarLista = useCallback(async () => {
     try {
       setCargandoLista(true);
       const { data } = await api.get("/api/registro", { params: { page:1, pageSize:200, abierto: true } });
@@ -448,7 +452,7 @@ export default function RegistroDiario() {
     } catch (e) {
       pushAlert("danger", e?.response?.data?.mensaje || "No se pudo actualizar la lista");
     } finally { setCargandoLista(false); }
-  };
+  }, [pushAlert]);
 
   /* ===== Guardar línea ===== */
   const onGuardar = useCallback(async () => {
@@ -482,14 +486,14 @@ export default function RegistroDiario() {
         : (e?.response?.data?.mensaje || "No se pudo registrar la línea");
       pushAlert("danger", msg); focusScanner();
     } finally { setEnviando(false); }
-  }, [enviando, pending, modoPeso, simLb, cableLb, pesoManual, pushAlert]);
+  }, [enviando, pending, modoPeso, simLb, cableLb, pesoManual, pushAlert, recargarLista, focusScanner]);
 
   const onCancelar = useCallback(() => {
     setPending(null); setUltimoLeido("");
     if (modoPeso === "simulada") { simRef.current?.tare?.(); setSimLb(0); }
     if (modoPeso === "manual") { setPesoManual("0.000"); }
     focusScanner();
-  }, [modoPeso]);
+  }, [modoPeso, focusScanner]);
 
   /* ===== Parser lector ===== */
   function parseScanRaw(rawText) {
@@ -520,7 +524,7 @@ export default function RegistroDiario() {
       setPending(parsed);
     }
     focusScanner();
-  }, []);
+  }, [focusScanner]);
 
   /* ===== Lector global (Hook) ===== */
   useScannerGlobal((obj, rawText) => {
@@ -561,7 +565,7 @@ export default function RegistroDiario() {
   }, [items]);
 
   /* ===== Historial: rango ===== */
-  const buildRange = () => {
+  const buildRange = useCallback(() => {
     let desde = "", hasta = "";
     if (filterMode === "dia" && fDia) {
       desde = `${fDia}T00:00:00`;
@@ -583,7 +587,7 @@ export default function RegistroDiario() {
       hasta = `${fHasta}T23:59:59`;
     }
     return { desde, hasta };
-  };
+  }, [filterMode, fDia, fMes, fAnio, fDesde, fHasta]);
 
   /* ===== Descargar PDF del historial con token ===== */
   const descargarHistPDF = async (url, filename = "reporte.pdf") => {
@@ -616,14 +620,11 @@ export default function RegistroDiario() {
       setHist(h => ({ ...h, loading: false }));
       pushAlert("danger", e?.response?.data?.mensaje || "No se pudo cargar el historial");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterMode, fDia, fMes, fAnio, fDesde, fHasta, fEncargado, pushAlert]);
+  }, [buildRange, fEncargado, pushAlert]);
 
   useEffect(() => {
     if (showHistorial) cargarHistorial(1);
   }, [showHistorial, cargarHistorial]);
-
-  const totalPages = Math.max(1, Math.ceil((hist.total || 0) / (hist.pageSize || 20)));
 
   return (
     <div className="rd-container">

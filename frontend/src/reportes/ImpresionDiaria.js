@@ -1,12 +1,18 @@
 // src/reportes/ImpresionDiaria.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { http as api } from "../config/api";
 import "./ImpresionDiaria.css";
 
+/* ================= Utiles ================= */
+
+const numberFmt = new Intl.NumberFormat("es-GT", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 function fmt(n) {
   const v = Number(n ?? 0);
-  if (Number.isNaN(v)) return "0.00";
-  return v.toFixed(2);
+  if (Number.isNaN(v)) return numberFmt.format(0);
+  return numberFmt.format(v);
 }
 
 // Formatea sin desfase por zona horaria; soporta "YYYY-MM-DD" y "YYYY-MM-DDTHH:MM..."
@@ -26,11 +32,16 @@ function dmy(iso) {
 const hyphenateTitle = (t) =>
   String(t || "").replace(/Punzocortantes/gi, "Punzocor\u00ADtantes");
 
+// yyyy-mm-dd de hoy
+const todayISO = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+  .toISOString()
+  .slice(0, 10);
+
 /**
  * ImpresiónDiaria
  * Props:
  *  - registroId?: number              -> si viene, imprime ese registro (por-registro)
- *  - fechaISO?: "YYYY-MM-DD"          -> si no hay registroId, imprime el diario por fecha
+ *  - fechaISO?: "YYYY-MM-DD"          -> si no hay registroId, imprime el diario por fecha (default: hoy)
  *  - unidad: "lb" | "kg" (default "lb")
  *  - soloAreasConDatos: boolean (default false)
  *  - data?: objeto DTO completo        -> si viene, se renderiza sin pedir nada al backend
@@ -46,53 +57,74 @@ export default function ImpresionDiaria({
   const [loading, setLoading] = useState(!data);
   const [err, setErr] = useState("");
 
-  useEffect(() => {
-    let cancel = false;
+  const resolvedFechaISO = useMemo(() => {
+    if (registroId) return undefined; // la fecha la define el backend por el registro
+    return fechaISO || todayISO();
+  }, [registroId, fechaISO]);
 
-    // Si ya nos pasaron el DTO listo, no hacemos fetch
+  async function fetchData(signal) {
+    setLoading(true);
+    setErr("");
+    try {
+      if (data) {
+        setDto(data);
+        return;
+      }
+      if (registroId) {
+        // Reporte POR REGISTRO
+        const { data: resp } = await api.get(
+          `/reportes/desechos/por-registro/${registroId}`,
+          { params: { unidad, soloAreasConDatos }, signal }
+        );
+        setDto(resp);
+      } else {
+        // Reporte DIARIO por fecha
+        const { data: resp } = await api.get(
+          "/reportes/desechos/diario",
+          { params: { fecha: resolvedFechaISO, unidad, soloAreasConDatos }, signal }
+        );
+        setDto(resp);
+      }
+    } catch (e) {
+      if (signal?.aborted) return;
+      const msg =
+        e?.response?.data?.mensaje ||
+        e?.message ||
+        "No se pudo obtener el reporte.";
+      setErr(msg);
+      setDto(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
     if (data) {
+      // Sin fetch si ya viene el DTO
       setDto(data);
       setLoading(false);
       setErr("");
       return;
     }
+    const ctrl = new AbortController();
+    fetchData(ctrl.signal);
+    return () => ctrl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registroId, resolvedFechaISO, unidad, soloAreasConDatos, data]);
 
-    (async () => {
-      try {
-        setLoading(true);
-        setErr("");
+  const unidadSub = (dto?.unidad || unidad) === "kg" ? "Kilogramos" : "Libras";
 
-        if (registroId) {
-          // Reporte POR REGISTRO (la fecha la define el backend como apertura del registro)
-          const { data: resp } = await api.get(`/reportes/desechos/por-registro/${registroId}`, {
-            params: { unidad, soloAreasConDatos },
-          });
-          if (!cancel) setDto(resp);
-        } else {
-          // Reporte DIARIO por fecha
-          const { data: resp } = await api.get("/reportes/desechos/diario", {
-            params: { fecha: fechaISO, unidad, soloAreasConDatos },
-          });
-          if (!cancel) setDto(resp);
-        }
-      } catch (e) {
-        if (!cancel) {
-          const msg =
-            e?.response?.data?.mensaje ||
-            e?.message ||
-            "No se pudo obtener el reporte.";
-          setErr(msg);
-          setDto(null);
-        }
-      } finally {
-        if (!cancel) setLoading(false);
-      }
-    })();
+  const columnas = Array.isArray(dto?.columnas) ? dto.columnas : [];
+  const filas = Array.isArray(dto?.filas) ? dto.filas : [];
+  const totales = Array.isArray(dto?.totales) ? dto.totales : [];
 
-    return () => {
-      cancel = true;
-    };
-  }, [registroId, fechaISO, unidad, soloAreasConDatos, data]);
+  const hayFilas = filas.length > 0;
+  const encabezado = dto?.encabezado || {};
+  const firma = dto?.firma || {};
+  const showFecha =
+    encabezado?.mostrarFecha === undefined ? true : !!encabezado.mostrarFecha;
+
+  /* ========= Render ========= */
 
   if (loading) {
     return (
@@ -105,29 +137,22 @@ export default function ImpresionDiaria({
     return (
       <div className="rpt-wrap" lang="es" role="alert">
         <div className="rpt-error">{err}</div>
+        <div style={{ marginTop: 8 }}>
+          <button
+            className="rpt-retry-btn"
+            onClick={() => fetchData()}
+            aria-label="Reintentar cargar reporte"
+          >
+            Reintentar
+          </button>
+        </div>
       </div>
     );
   }
   if (!dto) return null;
 
-  const {
-    encabezado = {},
-    columnas = [],
-    filas = [],
-    totales = [],
-    firma = {},
-    fecha,
-    unidad: unidadSrv = unidad,
-  } = dto;
-
-  const showFecha =
-    encabezado?.mostrarFecha === undefined ? true : !!encabezado.mostrarFecha;
-
-  const unidadSub = unidadSrv === "kg" ? "Kilogramos" : "Libras";
-  const hayFilas = Array.isArray(filas) && filas.length > 0;
-
   return (
-    <div className="rpt-wrap" lang="es" data-print-ready="1">
+    <div className="rpt-wrap" lang="es" data-print-ready="1" aria-label="Reporte diario de desechos">
       <header className="rpt-header">
         <div className="rpt-line rpt-line1">{encabezado.linea1 || ""}</div>
         <div className="rpt-line rpt-line2">{encabezado.linea2 || ""}</div>
@@ -136,7 +161,7 @@ export default function ImpresionDiaria({
         </div>
         {showFecha && (
           <div className="rpt-fecha">
-            <b>Fecha:</b> {dmy(fecha)}
+            <b>Fecha:</b> {dmy(dto.fecha || resolvedFechaISO)}
           </div>
         )}
       </header>
@@ -165,9 +190,10 @@ export default function ImpresionDiaria({
               <tr key={`${f.areaId ?? f.area ?? rIdx}`}>
                 <td className="area-col">{f.area}</td>
                 {columnas.map((c, i) => {
-                  // Preferimos buscar por tipoId; si es null/undefined, caemos por índice
-                  const byTipo =
-                    f.valores?.find((x) => x.tipoId === c.id)?.valor;
+                  // Busca por tipoId; si no está, cae por índice
+                  const byTipo = Array.isArray(f.valores)
+                    ? f.valores.find((x) => x?.tipoId === c.id)?.valor
+                    : undefined;
                   const v =
                     byTipo ??
                     (Array.isArray(f.valores) ? f.valores[i]?.valor : 0) ??
@@ -197,10 +223,14 @@ export default function ImpresionDiaria({
               <b>Total:</b>
             </td>
             {columnas.map((c, i) => {
-              // Igual que arriba: busca por tipoId o por índice como fallback
-              const byTipo = totales.find((x) => x.tipoId === c.id)?.valor;
+              // Busca por tipoId; si no está, cae por índice
+              const byTipo = Array.isArray(totales)
+                ? totales.find((x) => x?.tipoId === c.id)?.valor
+                : undefined;
               const v =
-                byTipo ?? (Array.isArray(totales) ? totales[i]?.valor : 0) ?? 0;
+                byTipo ??
+                (Array.isArray(totales) ? totales[i]?.valor : 0) ??
+                0;
               return (
                 <td key={`${c.id ?? "col"}-${i}`} className="num">
                   <b>{fmt(v)}</b>
@@ -213,7 +243,7 @@ export default function ImpresionDiaria({
         </tfoot>
       </table>
 
-      <div className="rpt-firma-block">
+      <div className="rpt-firma-block" aria-label="Bloque de firma">
         <div className="rpt-firma-line"></div>
         <div className="rpt-firma-nombre">{firma?.nombre || ""}</div>
         <div className="rpt-firma-cargo">{firma?.cargo || ""}</div>

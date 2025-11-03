@@ -1,14 +1,15 @@
 // src/Inicio.js
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./inicio.css";
 import { http } from "./config/api";
 
 /**
  * Props:
  * - usuario: objeto usuario
+ * - onGo?: (vistaId: string) => void  // opcional, si llega, hace clicables los tiles
  */
-export default function Inicio({ usuario = {} }) {
-  // Solo para esta página: quitar marco de .contenido (shell)
+export default function Inicio({ usuario = {}, onGo }) {
+  // ===== body class solo en esta página =====
   useEffect(() => {
     document.body.classList.add("inicio-page");
     return () => document.body.classList.remove("inicio-page");
@@ -17,26 +18,58 @@ export default function Inicio({ usuario = {} }) {
   // ===== KPIs desde backend =====
   const [kpi, setKpi] = useState({ bolsasRegistradas: 0, lbSemana: 0, areasActivas: 0 });
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+
+  const loadKpis = async () => {
+    try {
+      setErr("");
+      const { data } = await http.get("/api/dashboard/kpis");
+      setKpi({
+        bolsasRegistradas: Number(data?.bolsasRegistradas ?? 0),
+        lbSemana: Number(data?.lbSemana ?? 0),
+        areasActivas: Number(data?.areasActivas ?? 0),
+      });
+    } catch (e) {
+      setErr("No se pudieron cargar los indicadores.");
+      setKpi({ bolsasRegistradas: 0, lbSemana: 0, areasActivas: 0 });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
-    http
-      .get("/api/dashboard/kpis")
-      .then(({ data }) => { if (alive) setKpi(data); })
-      .catch(() => { if (alive) setKpi({ bolsasRegistradas: 0, lbSemana: 0, areasActivas: 0 }); })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
+    (async () => {
+      await loadKpis();
+    })();
+    // refresco cada 60s
+    const id = setInterval(() => { if (alive) loadKpis(); }, 60000);
+    return () => { alive = false; clearInterval(id); };
   }, []);
 
-  // ===== Formateador =====
-  const fmt = new Intl.NumberFormat("es-GT", { maximumFractionDigits: 1 });
+  // ===== Formateadores =====
+  const fmt = useMemo(() => new Intl.NumberFormat("es-GT", { maximumFractionDigits: 1 }), []);
+  const abbr = (n) => {
+    const x = Number(n || 0);
+    if (x >= 1_000_000) return `${(x / 1_000_000).toFixed(1)}M`;
+    if (x >= 1_000)     return `${(x / 1_000).toFixed(1)}k`;
+    return fmt.format(x);
+  };
 
   // ===== Ping visual cuando cambian los KPIs =====
   const [ping, setPing] = useState(false);
+  const prevRef = useRef(kpi);
   useEffect(() => {
-    setPing(true);
-    const t = setTimeout(() => setPing(false), 600);
-    return () => clearTimeout(t);
+    if (
+      prevRef.current.bolsasRegistradas !== kpi.bolsasRegistradas ||
+      prevRef.current.lbSemana !== kpi.lbSemana ||
+      prevRef.current.areasActivas !== kpi.areasActivas
+    ) {
+      setPing(true);
+      const t = setTimeout(() => setPing(false), 600);
+      prevRef.current = kpi;
+      return () => clearTimeout(t);
+    }
   }, [kpi]);
 
   const kpiTone = (key, val) => {
@@ -55,12 +88,10 @@ export default function Inicio({ usuario = {} }) {
     return "";
   };
 
-  const bolsasRegVal = loading ? "…" : fmt.format(kpi.bolsasRegistradas ?? 0);
-
   const stats = [
-    { key: "bolsasRegistradas", label: "Bolsas registradas", value: bolsasRegVal, icon: "🗳️" },
-    { key: "lbSemana",          label: "lb recolectadas (semana)", value: loading ? "…" : fmt.format(kpi.lbSemana), icon: "⚖️" },
-    { key: "areasActivas",      label: "Áreas activas", value: loading ? "…" : fmt.format(kpi.areasActivas), icon: "🏥" },
+    { key: "bolsasRegistradas", label: "Bolsas registradas", value: loading ? "…" : abbr(kpi.bolsasRegistradas), icon: "🗳️" },
+    { key: "lbSemana",          label: "lb recolectadas (semana)", value: loading ? "…" : abbr(kpi.lbSemana), icon: "⚖️" },
+    { key: "areasActivas",      label: "Áreas activas", value: loading ? "…" : abbr(kpi.areasActivas), icon: "🏥" },
   ];
 
   // ===== Tips rotativos =====
@@ -102,6 +133,29 @@ export default function Inicio({ usuario = {} }) {
       text: "Capacitamos al personal para mejorar la cultura del manejo de residuos y prevenir riesgos." },
   ];
 
+  // helper para CTA: si hay onGo, que sea botón; si no, estático
+  const Cta = ({ to, icon, title, hint, tone }) => {
+    const className = `cta ${tone} ${onGo ? "" : "cta-static"}`;
+    return onGo ? (
+      <button
+        type="button"
+        className={className}
+        onClick={() => onGo(to)}
+        aria-label={title}
+      >
+        <span className="cta-ico" aria-hidden>{icon}</span>
+        {title}
+        <small className="cta-hint">{hint}</small>
+      </button>
+    ) : (
+      <div className={`${className}`} role="note" aria-label={title}>
+        <span className="cta-ico" aria-hidden>{icon}</span>
+        {title}
+        <small className="cta-hint">{hint}</small>
+      </div>
+    );
+  };
+
   return (
     <div className="inicio-wrap" data-reduce="0">
       {/* Burbujas decorativas */}
@@ -121,43 +175,38 @@ export default function Inicio({ usuario = {} }) {
             <p className="quote">“Cuidar el entorno empieza desde el lugar donde salvamos vidas.”</p>
           </header>
 
-          {/* Resumen inicial neutro (sin botones, no clicable) */}
-          <div className="action-grid neutral-grid" aria-label="Resumen general">
-            <div className="cta cta-green cta-static" role="note" aria-label="Registro de bolsas">
-              <span className="cta-ico" aria-hidden>🧾</span>
-              Registro de bolsas
-              <small className="cta-hint">Carga diaria por área, peso y tipo</small>
-            </div>
-            <div className="cta cta-cyan cta-static" role="note" aria-label="Códigos QR">
-              <span className="cta-ico" aria-hidden>🔗</span>
-              Códigos QR
-              <small className="cta-hint">Trazabilidad de bolsas y escaneo</small>
-            </div>
-            <div className="cta cta-ghost cta-static" role="note" aria-label="Estadísticas">
-              <span className="cta-ico" aria-hidden>📊</span>
-              Estadísticas
-              <small className="cta-hint">Indicadores y reportes del sistema</small>
-            </div>
+          {/* Resumen/acciones */}
+          <div className={`action-grid ${onGo ? "" : "neutral-grid"}`} aria-label="Acciones principales">
+            <Cta to="registro" icon="🧾" title="Registro de bolsas" hint="Carga diaria por área, peso y tipo" tone="cta-green" />
+            <Cta to="qrs" icon="🔗" title="Códigos QR" hint="Trazabilidad de bolsas y escaneo" tone="cta-cyan" />
+            <Cta to="estadisticas" icon="📊" title="Estadísticas" hint="Indicadores y reportes del sistema" tone="cta-ghost" />
           </div>
+
+          {err && (
+            <div className="hero-error" role="alert">
+              {err} <button className="btn-retry" onClick={loadKpis}>Reintentar</button>
+            </div>
+          )}
         </div>
       </section>
 
       {/* KPIs */}
       <section className="stats" aria-label="Indicadores rápidos">
         {stats.map((s) => {
-          const tone = kpiTone(s.key, s.value);
-          return (
-            <div
-              key={s.key}
-              className={`stat-card ${tone} ${ping ? "ping" : ""}`}
-              role="status"
-              aria-live="polite"
-            >
-              <div className="stat-ico" aria-hidden>{s.icon}</div>
-              <div className="stat-val">{s.value}</div>
-              <div className="stat-lab">{s.label}</div>
-            </div>
-          );
+          const tone = kpiTone(s.key, loading ? 0 : (s.key === "bolsasRegistradas" ? kpi.bolsasRegistradas :
+                                                      s.key === "lbSemana" ? kpi.lbSemana : kpi.areasActivas));
+        return (
+          <div
+            key={s.key}
+            className={`stat-card ${tone} ${ping ? "ping" : ""} ${loading ? "is-loading" : ""}`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="stat-ico" aria-hidden>{s.icon}</div>
+            <div className="stat-val">{s.value}</div>
+            <div className="stat-lab">{s.label}</div>
+          </div>
+        );
         })}
       </section>
 
@@ -169,7 +218,7 @@ export default function Inicio({ usuario = {} }) {
         </div>
 
         <div className="info-strip" aria-label="Datos útiles sobre residuos">
-          <div className="strip-track">
+          <div className="strip-track" aria-hidden="true">
             {facts.map((f, i) => (
               <span className="strip-item" key={`a-${i}`}>
                 <i aria-hidden="true" />

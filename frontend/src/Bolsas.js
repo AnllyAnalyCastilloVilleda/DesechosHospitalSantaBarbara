@@ -1,5 +1,5 @@
 // src/Bolsas.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { http as api } from "./config/api";
 import "./Bolsas.css";
@@ -70,16 +70,8 @@ export default function Bolsas() {
   // Search
   const [q, setQ] = useState("");
 
-  useEffect(() => { loadTipos(); }, []);
-
-  // === Auto-actualización: al escribir o cambiar el filtro (debounce 400ms) ===
-  useEffect(() => {
-    const handle = setTimeout(() => { load(); }, 400);
-    return () => clearTimeout(handle);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, showDisabled]);
-
-  async function loadTipos() {
+  /* -------- Cargas ESTABLES -------- */
+  const loadTipos = useCallback(async () => {
     try {
       const { data } = await api.get("/tipos-desecho", { params: { estado: "activos" } });
       setTipos(Array.isArray(data) ? data : []);
@@ -87,9 +79,9 @@ export default function Bolsas() {
       console.error(e);
       setTipos([]);
     }
-  }
+  }, []);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       const params = {
@@ -104,7 +96,16 @@ export default function Bolsas() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [q, showDisabled]);
+
+  // Cargar tipos una vez (función estable)
+  useEffect(() => { loadTipos(); }, [loadTipos]);
+
+  // Auto-actualización con debounce correcto y dependencias completas
+  useEffect(() => {
+    const handle = setTimeout(() => { load(); }, 400);
+    return () => clearTimeout(handle);
+  }, [q, showDisabled, load]);
 
   function resetForm() {
     setEditId(null);
@@ -359,8 +360,12 @@ export default function Bolsas() {
 
                 <div className="field">
                   <label>Descripción</label>
-                  <textarea rows={4} placeholder="Breve descripción de la bolsa" value={descripcion}
-                    onChange={(e) => setDescripcion(e.target.value)} />
+                  <textarea
+                    rows={4}
+                    placeholder="Breve descripción de la bolsa"
+                    value={descripcion}
+                    onChange={(e) => setDescripcion(e.target.value)}
+                  />
                 </div>
 
                 <div className="bls-modal-footer">
@@ -370,7 +375,8 @@ export default function Bolsas() {
                     className="bolsa-btn bolsa-btn-primary bolsa-btn-sm"
                     disabled={saving || !color.trim() || !tamano.trim() || !tipoDesechoId}
                   >
-                    {modalMode === "edit" ? (saving ? "Guardando..." : "Guardar cambios")
+                    {modalMode === "edit"
+                      ? (saving ? "Guardando..." : "Guardar cambios")
                       : (saving ? "Creando..." : "Guardar")}
                   </button>
                 </div>
@@ -384,4 +390,4 @@ export default function Bolsas() {
       <ConfirmDialog {...confirm} />
     </div>
   );
-} 
+}

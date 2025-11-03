@@ -1,5 +1,5 @@
 // src/Areas.js
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { http } from "./config/api";
 import "./Areas.css";
 
@@ -216,32 +216,31 @@ export default function Areas() {
   // Selección en el formulario (crear/editar)
   const [formTipoIds, setFormTipoIds] = useState([]);
 
-  useEffect(() => { loadAreas(); }, [q, showDeleted]);
-  useEffect(() => { loadTipos(); }, []); // una vez
-
-  async function loadAreas() {
+  // ---- funciones ESTABLES ----
+  const loadAreas = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       if (q) params.set("q", q);
       params.set("estado", showDeleted ? "eliminados" : "activos");
       const { data } = await http.get(`/areas?${params.toString()}`);
       setRows(data || []);
-    } catch { setRows([]); }
-  }
+    } catch {
+      setRows([]);
+    }
+  }, [q, showDeleted]);
 
-  async function loadTipos() {
+  const loadTipos = useCallback(async () => {
     try {
       // Preferimos activos; si no existe ese filtro en tu API, quita "params"
       const { data } = await http.get("/tipos-desecho", { params: { estado: "activos" } });
-      // normalizar
       const list = Array.isArray(data) ? data : (data?.rows || []);
       setTipos(list.map(t => ({ id: t.id, nombre: t.nombre, slug: t.slug })));
     } catch {
       setTipos([]);
     }
-  }
+  }, []);
 
-  async function loadTiposDeArea(areaId) {
+  const loadTiposDeArea = useCallback(async (areaId) => {
     try {
       const { data } = await http.get(`/areas/${areaId}/tipos`);
       const ids = (data?.tipos || []).map(t => t.id);
@@ -249,7 +248,11 @@ export default function Areas() {
     } catch {
       setFormTipoIds([]);
     }
-  }
+  }, []);
+
+  // effects con dependencias correctas
+  useEffect(() => { loadAreas(); }, [loadAreas]);
+  useEffect(() => { loadTipos(); }, [loadTipos]); // una vez
 
   function toastOk(text) { setToast({ text, type: "success" }); }
   function toastErr(text) { setToast({ text, type: "danger" }); }

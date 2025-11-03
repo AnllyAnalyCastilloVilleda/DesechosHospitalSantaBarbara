@@ -1,17 +1,17 @@
 // src/Usuarios.jsx
 import React, { useEffect, useState } from "react";
-import { http } from "./config/api";
+import http from "./config/api"; // ⬅️ default export (consistente con el resto)
 import "./Usuarios.css";
 
 /* ============ Modal genérico ============ */
 function Modal({ open, title, children, onClose, maxWidth = 560 }) {
   if (!open) return null;
   return (
-    <div className="u-modal-overlay" role="dialog" aria-modal="true">
+    <div className="u-modal-overlay" role="dialog" aria-modal="true" aria-label={title || "Ventana modal"}>
       <div className="u-modal-card" style={{ maxWidth }}>
         <div className="u-modal-head">
           <h3>{title}</h3>
-          <button className="u-btn u-btn-light" onClick={onClose}>✕</button>
+          <button className="u-btn u-btn-light" onClick={onClose} title="Cerrar">✕</button>
         </div>
         <div className="u-modal-body">{children}</div>
       </div>
@@ -32,11 +32,11 @@ function ConfirmDialog({
 }) {
   if (!open) return null;
   return (
-    <div className="u-modal-overlay" role="dialog" aria-modal="true">
+    <div className="u-modal-overlay" role="dialog" aria-modal="true" aria-label={title}>
       <div className="u-modal-card" style={{ maxWidth: 520 }}>
         <div className="u-modal-head">
           <h3>{title}</h3>
-          <button className="u-btn u-btn-light" onClick={onCancel}>✕</button>
+          <button className="u-btn u-btn-light" onClick={onCancel} title="Cerrar">✕</button>
         </div>
         <div className="u-modal-body">
           <p className="u-paragraph">{message}</p>
@@ -91,7 +91,15 @@ function UsuarioForm({ initial = {}, roles = [], onSubmit, loading, excludeId, m
     rolId: "",
     ...initial,
   });
-  useEffect(() => { setF(s => ({ ...s, ...initial })); }, [initial]);
+
+  useEffect(() => {
+    setF(s => ({
+      ...s,
+      ...initial,
+      // normaliza rolId a string para que el <select> no parpadee
+      rolId: initial.rolId != null ? String(initial.rolId) : "",
+    }));
+  }, [initial]);
 
   const set = (k, v) => setF(s => ({ ...s, [k]: v }));
 
@@ -115,8 +123,10 @@ function UsuarioForm({ initial = {}, roles = [], onSubmit, loading, excludeId, m
       const wantCheckCorreo  = correoUsable && !sameCorreo;
 
       if (!wantCheckUsuario && !wantCheckCorreo) {
-        setDup({ usuario: false, correo: false });
-        setChecking(false);
+        if (!cancel) {
+          setDup({ usuario: false, correo: false });
+          setChecking(false);
+        }
         return;
       }
 
@@ -189,9 +199,13 @@ function UsuarioForm({ initial = {}, roles = [], onSubmit, loading, excludeId, m
       </label>
 
       <label>Rol
-        <select className="u-input" value={f.rolId} onChange={e => set("rolId", e.target.value)}>
+        <select
+          className="u-input"
+          value={String(f.rolId || "")}
+          onChange={e => set("rolId", e.target.value)}
+        >
           <option value="">Seleccionar…</option>
-          {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+          {roles.map(r => <option key={r.id} value={String(r.id)}>{r.nombre}</option>)}
         </select>
       </label>
 
@@ -218,6 +232,7 @@ function UsuarioForm({ initial = {}, roles = [], onSubmit, loading, excludeId, m
 /* ============ Página ============ */
 export default function Usuarios() {
   const [q, setQ] = useState("");
+  const qDeb = useDebounced(q, 350); // ⬅️ evita llamados por tecla
   const [showDeleted, setShowDeleted] = useState(false);
   const [rows, setRows] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -230,7 +245,7 @@ export default function Usuarios() {
   const [confirm, setConfirm] = useState({ open: false });
 
   useEffect(() => { loadRoles(); }, []);
-  useEffect(() => { loadUsers(); }, [q, showDeleted]);
+  useEffect(() => { loadUsers(); }, [qDeb, showDeleted]); // ⬅️ usa debounce
 
   async function loadRoles() {
     try {
@@ -244,7 +259,7 @@ export default function Usuarios() {
   async function loadUsers() {
     try {
       const params = new URLSearchParams();
-      if (q) params.set("q", q);
+      if (qDeb) params.set("q", qDeb);
       params.set("estado", showDeleted ? "eliminados" : "activos");
       const { data } = await http.get(`/usuarios?${params.toString()}`);
       setRows(data || []);
@@ -259,8 +274,7 @@ export default function Usuarios() {
   async function createUser(f) {
     setBusy(true);
     try {
-      // f ya sólo contiene nombre, usuario, correo y rolId
-      await http.post(`/usuarios`, f);
+      await http.post(`/usuarios`, f); // f: {nombre,usuario,correo,rolId}
       setCreating(false);
       toastOk("Usuario creado y correo enviado.");
       await loadUsers();
@@ -378,6 +392,7 @@ export default function Usuarios() {
             placeholder="Buscar por nombre, usuario o correo…"
             value={q}
             onChange={e => setQ(e.target.value)}
+            aria-label="Buscar usuarios"
           />
           <button className="u-btn u-btn-primary" onClick={() => setCreating(true)}>
             + Crear nuevo usuario
