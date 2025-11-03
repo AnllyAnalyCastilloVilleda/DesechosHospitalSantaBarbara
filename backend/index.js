@@ -59,18 +59,29 @@ const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'secreto123';
 const SCALE_ENABLED = process.env.SCALE_ENABLED !== 'false'; // por defecto true
 
-/* ===== CORS GLOBAL (sin cookies) =====
-   Responde a TODOS los preflights con 200 y añade los headers a toda respuesta.
-   Como usamos Bearer en Authorization (no cookies), '*' es válido.
-*/
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*'); // si quieres, cámbialo luego por tu dominio de Netlify
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Max-Age', '86400'); // cachear preflight por 24h
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  next();
-});
+import cors from 'cors'; // ↑ agrega este import arriba
+
+const ALLOWED_ORIGINS = [
+  'https://gestion-desechos-hospital.netlify.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
+
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin) return cb(null, true);                   // Postman/cURL
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS: ' + origin));
+  },
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  credentials: false,            // usas Bearer, no cookies
+  optionsSuccessStatus: 204,
+}));
+
+// Responder cualquier preflight ANTES de las rutas
+app.options('*', cors());
+
 
 /* ===== Middlewares base ===== */
 app.use(express.json({ limit: '25mb' }));
