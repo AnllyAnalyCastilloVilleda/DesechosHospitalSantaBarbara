@@ -62,10 +62,13 @@ const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'secreto123';
 
-// CORS: defaults + override por CORS_ORIGINS
+/* ===== CORS =====
+   Agregamos tu dominio de Netlify y autorizamos Authorization header.
+*/
 const defaults = [
   'http://localhost:5173',
   'http://localhost:3000',
+  'https://gestion-desechos-hospital.netlify.app',
   'https://desechoshospitalsantabarbara-production.up.railway.app',
 ];
 const origins = (process.env.CORS_ORIGINS || defaults.join(','))
@@ -73,11 +76,21 @@ const origins = (process.env.CORS_ORIGINS || defaults.join(','))
   .map((s) => s.trim())
   .filter(Boolean);
 
-// Flag para habilitar/deshabilitar balanza en el entorno
-const SCALE_ENABLED = process.env.SCALE_ENABLED !== 'false'; // por defecto true
+const corsOptions = {
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // permitir tools sin Origin (curl/Postman)
+    cb(null, origins.includes(origin));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false, // no usamos cookies; el token va en Authorization
+};
+
+// CORS global + respuesta a preflights
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 /* ===== Middlewares base ===== */
-app.use(cors({ origin: origins, credentials: true }));
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
