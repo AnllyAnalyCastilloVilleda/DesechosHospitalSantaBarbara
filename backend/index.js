@@ -24,8 +24,7 @@ import tiposDesechoRoutes from './src/routes/tiposDesecho.routes.cjs';
 import qrRoutes           from './src/routes/qr.routes.cjs';
 import reportesRoutes     from './src/routes/reportes.desechos.cjs';
 import registroRoutes     from './src/routes/registro.routes.cjs';
-// Si tienes dashboard.routes.cjs, podrías montarlo también:
-// import dashboardRoutes  from './src/routes/dashboard.routes.cjs';
+// import dashboardRoutes  from './src/routes/dashboard.routes.cjs'; // si aplica
 
 // ===== Rutas de balanza (CJS) =====
 import scaleRoutesFactory from './src/scale/scale.routes.cjs'; // CJS
@@ -38,12 +37,12 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = createServer(app);
 const prisma = new PrismaClient({
-  // logs opcionales para detectar queries lentas; puedes quitarlos si no los usas
   log: [{ level: 'query', emit: 'event' }, 'warn', 'error'],
 });
 prisma.$on('query', (e) => {
   if (e.duration > 500) console.log('[SQL lenta]', e.duration + 'ms', e.query);
 });
+
 // ===== Keep-alive para Neon (evita cold start) =====
 const KEEPALIVE_MS = 60_000; // 1 minuto
 let keepAliveTimer = null;
@@ -52,12 +51,9 @@ async function keepAlive() {
   try {
     await prisma.$queryRaw`SELECT 1`;
   } catch (e) {
-    // silencioso: si falla por desconexión momentánea no queremos romper el server
     console.warn('keepAlive fallo:', e?.message || e);
   }
 }
-
-// primera vez al arrancar y luego cada minuto
 keepAlive();
 keepAliveTimer = setInterval(keepAlive, KEEPALIVE_MS);
 
@@ -65,8 +61,17 @@ keepAliveTimer = setInterval(keepAlive, KEEPALIVE_MS);
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'secreto123';
-const origins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://192.168.1.73:3000')
-  .split(',').map(s => s.trim()).filter(Boolean);
+
+// CORS: defaults + override por CORS_ORIGINS
+const defaults = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://desechoshospitalsantabarbara-production.up.railway.app',
+];
+const origins = (process.env.CORS_ORIGINS || defaults.join(','))
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 // Flag para habilitar/deshabilitar balanza en el entorno
 const SCALE_ENABLED = process.env.SCALE_ENABLED !== 'false'; // por defecto true
@@ -84,6 +89,27 @@ app.use('/files', express.static(path.join(process.cwd(), 'files'), {
   fallthrough: true,
   maxAge: '1y',
 }));
+
+/* ==============================
+   Rutas públicas mínimas
+   ============================== */
+app.get('/', (_req, res) => res.send('OK')); // raíz para probar en Railway
+
+app.get('/health', (_req, res) => res.json({ ok: true, status: 'healthy' }));
+
+// Ping a la BD y mide latencia
+app.get('/health/db', async (_req, res) => {
+  const t0 = Date.now();
+  try {
+    await prisma.$queryRaw`SELECT 1`; // ping
+    const ms = Date.now() - t0;
+    const usuarios = await prisma.usuario.count().catch(() => null);
+    res.json({ ok: true, db: 'up', pingMs: ms, usuarios });
+  } catch (e) {
+    console.error('DB health error:', e);
+    res.status(500).json({ ok: false, db: 'down' });
+  }
+});
 
 /* ==============================
    Asegurar permisos base
@@ -131,33 +157,15 @@ function requirePerm(perm) {
   return (req, res, next) => {
     const perms = req.user?.permisos || [];
     const needed = Array.isArray(perm) ? perm : [perm];
-    const ok = needed.some(p => perms.includes(p));
+    const ok = needed.some((p) => perms.includes(p));
     if (!ok) return res.status(403).json({ mensaje: 'Permiso denegado' });
     next();
   };
 }
 
 /* ==============================
-   Rutas públicas mínimas
+   Handlers de Auth
    ============================== */
-app.get('/health', (_req, res) => res.json({ ok: true, status: 'healthy' }));
-
-// Ping a la BD y mide latencia
-app.get('/health/db', async (_req, res) => {
-  const t0 = Date.now();
-  try {
-    await prisma.$queryRaw`SELECT 1`; // ping
-    const ms = Date.now() - t0;
-    // (opcional) un conteo rápido para probar Prisma
-    const usuarios = await prisma.usuario.count().catch(() => null);
-    res.json({ ok: true, db: 'up', pingMs: ms, usuarios });
-  } catch (e) {
-    console.error('DB health error:', e);
-    res.status(500).json({ ok: false, db: 'down' });
-  }
-});
-
-// Handlers compartidos de auth
 async function loginHandler(req, res) {
   const { usuario, contrasena } = req.body;
   try {
@@ -180,7 +188,7 @@ async function loginHandler(req, res) {
       });
     }
 
-    const permisos = user.rol.permisos.map(rp => rp.permiso.nombre);
+    const permisos = user.rol.permisos.map((rp) => rp.permiso.nombre);
     const token = jwt.sign(
       { id: user.id, usuario: user.usuario, rol: user.rol.nombre, rolId: user.rolId, permisos },
       JWT_SECRET,
@@ -257,7 +265,7 @@ async function meHandler(req, res) {
       include: { rol: { include: { permisos: { include: { permiso: true } } } } },
     });
     if (!u) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
-    const permisos = u.rol.permisos.map(rp => rp.permiso.nombre);
+    const permisos = u.rol.permisos.map((rp) => rp.permiso.nombre);
     res.json({
       id: u.id,
       nombre: u.nombre,
@@ -437,8 +445,8 @@ function fromGT(dGT) { return new Date(dGT.getTime() - GT_OFFSET_MS); }
 function startOfGtDayUtc(d = new Date())  { const g = toGT(d); g.setHours(0,0,0,0);  return fromGT(g); }
 function endOfGtDayUtc(d = new Date())    { const g = toGT(d); g.setHours(24,0,0,0); return fromGT(g); }
 function startOfGtWeekUtc(d = new Date()) {
-  const g = toGT(d); const dow = g.getDay();            // 0=Dom, 1=Lun...
-  const diff = (dow === 0 ? -6 : 1 - dow);              // llevar a Lunes
+  const g = toGT(d); const dow = g.getDay(); // 0=Dom, 1=Lun...
+  const diff = (dow === 0 ? -6 : 1 - dow);   // llevar a Lunes
   g.setDate(g.getDate() + diff); g.setHours(0,0,0,0);
   return fromGT(g);
 }
