@@ -2,7 +2,6 @@
 import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
-import cors from 'cors';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -48,11 +47,8 @@ const KEEPALIVE_MS = 60_000; // 1 minuto
 let keepAliveTimer = null;
 
 async function keepAlive() {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-  } catch (e) {
-    console.warn('keepAlive fallo:', e?.message || e);
-  }
+  try { await prisma.$queryRaw`SELECT 1`; }
+  catch (e) { console.warn('keepAlive fallo:', e?.message || e); }
 }
 keepAlive();
 keepAliveTimer = setInterval(keepAlive, KEEPALIVE_MS);
@@ -61,47 +57,20 @@ keepAliveTimer = setInterval(keepAlive, KEEPALIVE_MS);
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'secreto123';
+const SCALE_ENABLED = process.env.SCALE_ENABLED !== 'false'; // por defecto true
 
-/* ===== CORS =====
-   Agregamos tu dominio de Netlify y autorizamos Authorization header.
+/* ===== CORS GLOBAL (sin cookies) =====
+   Responde a TODOS los preflights con 200 y añade los headers a toda respuesta.
+   Como usamos Bearer en Authorization (no cookies), '*' es válido.
 */
-const defaults = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'https://gestion-desechos-hospital.netlify.app',
-  'https://desechoshospitalsantabarbara-production.up.railway.app',
-];
-const origins = (process.env.CORS_ORIGINS || defaults.join(','))
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-const corsOptions = {
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // permitir tools sin Origin (curl/Postman)
-    cb(null, origins.includes(origin));
-  },
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false, // no usamos cookies; el token va en Authorization
-};
-
-// CORS ABIERTO (sin cookies). Útil mientras estabilizamos.
-// Colócalo inmediatamente después de: const app = express();
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*'); // o pon tu dominio si quieres restringir
+  res.setHeader('Access-Control-Allow-Origin', '*'); // si quieres, cámbialo luego por tu dominio de Netlify
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  // Preflight corta aquí con 204 para que no pase a routers que no manejan OPTIONS
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  res.setHeader('Access-Control-Max-Age', '86400'); // cachear preflight por 24h
+  if (req.method === 'OPTIONS') return res.status(200).end();
   next();
 });
-
-
-
-// CORS global + respuesta a preflights
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 /* ===== Middlewares base ===== */
 app.use(express.json({ limit: '25mb' }));
@@ -512,7 +481,7 @@ app.get('/api/dashboard/kpis', auth, async (_req, res) => {
    Socket.IO + Balanza (lazy import)
    ============================== */
 const io = new SocketIOServer(server, {
-  cors: { origin: origins, credentials: true, methods: ['GET', 'POST'] }
+  cors: { origin: '*', credentials: false, methods: ['GET', 'POST'] }
 });
 
 let scaleSvc = null;
