@@ -15,7 +15,6 @@ import * as emailSvc from './src/services/email.js'; // ESM
 const { sendNewUserEmail, sendTempPasswordEmail } = emailSvc;
 
 // ===== Routers en CommonJS (.cjs) =====
-// (al importar CJS desde ESM, el "default" es module.exports)
 import usuariosRoutes     from './src/routes/usuarios.routes.cjs';
 import areasRoutes        from './src/routes/areas.routes.cjs';
 import bolsasRoutes       from './src/routes/bolsas.routes.cjs';
@@ -45,7 +44,6 @@ prisma.$on('query', (e) => {
 // ===== Keep-alive para Neon (evita cold start) =====
 const KEEPALIVE_MS = 60_000; // 1 minuto
 let keepAliveTimer = null;
-
 async function keepAlive() {
   try { await prisma.$queryRaw`SELECT 1`; }
   catch (e) { console.warn('keepAlive fallo:', e?.message || e); }
@@ -59,7 +57,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'secreto123';
 const SCALE_ENABLED = process.env.SCALE_ENABLED !== 'false'; // por defecto true
 
-import cors from 'cors'; // ↑ agrega este import arriba
+import cors from 'cors';
 
 const ALLOWED_ORIGINS = [
   'https://gestion-desechos-hospital.netlify.app',
@@ -75,13 +73,15 @@ app.use(cors({
   },
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
-  credentials: false,            // usas Bearer, no cookies
+  credentials: false,
   optionsSuccessStatus: 204,
 }));
 
-// Responder cualquier preflight ANTES de las rutas
-app.options('*', cors());
-
+// Preflight global (Express 5): usa parámetro nombrado con comodín
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 
 /* ===== Middlewares base ===== */
 app.use(express.json({ limit: '25mb' }));
@@ -100,14 +100,13 @@ app.use('/files', express.static(path.join(process.cwd(), 'files'), {
    Rutas públicas mínimas
    ============================== */
 app.get('/', (_req, res) => res.send('OK')); // raíz para probar en Railway
-
 app.get('/health', (_req, res) => res.json({ ok: true, status: 'healthy' }));
 
 // Ping a la BD y mide latencia
 app.get('/health/db', async (_req, res) => {
   const t0 = Date.now();
   try {
-    await prisma.$queryRaw`SELECT 1`; // ping
+    await prisma.$queryRaw`SELECT 1`;
     const ms = Date.now() - t0;
     const usuarios = await prisma.usuario.count().catch(() => null);
     res.json({ ok: true, db: 'up', pingMs: ms, usuarios });
@@ -529,6 +528,13 @@ if (scaleSvc) {
     res.status(503).json({ mensaje: 'Módulo de balanza no disponible en este entorno' });
   });
 }
+
+/* ==============================
+   404 y manejo de errores simples
+   ============================== */
+app.use((req, res) => {
+  res.status(404).json({ mensaje: 'Not found' });
+});
 
 /* ==============================
    Server
