@@ -3,13 +3,20 @@ import nodemailer from 'nodemailer';
 
 const APP_NAME = process.env.APP_NAME || 'Hospital Santa Bárbara';
 const APP_URL  = process.env.APP_URL  || 'http://localhost:5001';
-const FROM     = process.env.SMTP_USER;
 
+// Remitente con tu dominio verificado en Resend
+// Puedes sobreescribirlo con MAIL_FROM en tus variables de entorno
+const FROM = process.env.MAIL_FROM || 'notificaciones@hospitalsantabarbara.it.com';
+
+// === Transporter usando Resend (SMTP)
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
+  host: 'smtp.resend.com',
   port: 465,
   secure: true, // TLS
-  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  auth: {
+    user: FROM,                       // el remitente debe ser del dominio verificado
+    pass: process.env.RESEND_API_KEY, // API Key de Resend
+  },
 });
 
 function escapeHtml(s = '') {
