@@ -3,20 +3,22 @@ import nodemailer from 'nodemailer';
 
 const APP_NAME = process.env.APP_NAME || 'Hospital Santa Bárbara';
 const APP_URL  = process.env.APP_URL  || 'http://localhost:5001';
+const FROM     = process.env.MAIL_FROM || 'notificaciones@hospitalsantabarbaramorales.com';
 
-// Remitente con tu dominio verificado en Resend
-// Puedes sobreescribirlo con MAIL_FROM en tus variables de entorno
-const FROM = process.env.MAIL_FROM || 'notificaciones@hospitalsantabarbara.it.com';
-
-// === Transporter usando Resend (SMTP)
+// === Transporter usando Resend (SMTP correcto)
 const transporter = nodemailer.createTransport({
   host: 'smtp.resend.com',
-  port: 465,
-  secure: true, // TLS
+  port: 587,          // 587 + STARTTLS recomendado
+  secure: false,      // true solo si usas 465
   auth: {
-    user: FROM,                       // el remitente debe ser del dominio verificado
-    pass: process.env.RESEND_API_KEY, // API Key de Resend
+    user: 'resend',                 // <-- NO uses tu correo aquí
+    pass: process.env.RESEND_API_KEY,
   },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 20000,
+  logger: true,
+  debug: true,
 });
 
 function escapeHtml(s = '') {
@@ -64,31 +66,24 @@ function baseHtml({ title, greeting, intro, rows = [], cta, footerNote }) {
       <tr>
         <td align="center">
           <table role="presentation" width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;">
-            <!-- Card -->
             <tr>
               <td>
-                <div style="background:${brand.card};border-radius:16px;padding:26px;
-                            border:1px solid ${brand.line};
-                            box-shadow:0 8px 28px rgba(17, 24, 39, .08);
+                <div style="background:${brand.card};border-radius:16px;padding:26px;border:1px solid ${brand.line};
+                            box-shadow:0 8px 28px rgba(17,24,39,.08);
                             font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:${brand.text}">
                   <h1 style="margin:0 0 8px 0;font-size:22px;line-height:1.2;color:${brand.primary};">${escapeHtml(title)}</h1>
                   <p style="margin:0 0 8px 0;">${greeting}</p>
                   ${intro ? `<p style="margin:0 0 14px 0;color:${brand.text}">${intro}</p>` : ''}
-
-                  <table role="presentation" style="margin:6px 0 6px 0;border-collapse:collapse;width:auto">
+                  <table role="presentation" style="margin:6px 0;border-collapse:collapse;width:auto">
                     ${rowsHtml}
                   </table>
-
                   ${ctaHtml}
-
                   <p style="margin:10px 0 0 0;font-size:12px;color:${brand.muted}">
                     ${footerNote || 'Si no esperabas este correo, puedes ignorarlo.'}
                   </p>
                 </div>
               </td>
             </tr>
-
-            <!-- Footer -->
             <tr>
               <td style="text-align:center;padding:14px 10px;color:${brand.muted};
                          font-size:12px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -100,18 +95,21 @@ function baseHtml({ title, greeting, intro, rows = [], cta, footerNote }) {
       </tr>
     </table>
   </body>
-</html>
-  `;
+</html>`;
 }
 
 async function sendMail({ to, subject, html, text }) {
-  return transporter.sendMail({
-    from: `"${APP_NAME}" <${FROM}>`,
-    to,
-    subject,
-    html,
-    text,
-  });
+  try {
+    const info = await transporter.sendMail({
+      from: `"${APP_NAME}" <${FROM}>`, // FROM debe ser un remitente de tu dominio verificado en Resend
+      to, subject, html, text,
+    });
+    return { ok: true, info };
+  } catch (err) {
+    console.error('Fallo al enviar correo:', err);
+    // No rompas el flujo de tu API
+    return { ok: false, error: 'No se pudo enviar el correo en este momento.' };
+  }
 }
 
 /** Bienvenida / alta de usuario */
@@ -145,7 +143,7 @@ export async function sendNewUserEmail({ to, nombre, usuario, tempPassword, rolN
     'Al ingresar se te pedirá cambiar la contraseña.'
   ].filter(Boolean).join('\n');
 
-  await sendMail({ to, subject: 'Tu acceso al sistema', html, text });
+  return sendMail({ to, subject: 'Tu acceso al sistema', html, text });
 }
 
 /** Reenvío de contraseña temporal */
@@ -179,11 +177,7 @@ export async function sendTempPasswordEmail({ to, nombre, usuario, tempPassword,
     'Al ingresar se te pedirá cambiarla.'
   ].join('\n');
 
-  await sendMail({ to, subject: 'Nueva contraseña temporal', html, text });
+  return sendMail({ to, subject: 'Nueva contraseña temporal', html, text });
 }
 
-/* (Opcional) export default para importar como namespace si quieres */
-export default {
-  sendNewUserEmail,
-  sendTempPasswordEmail,
-};
+export default { sendNewUserEmail, sendTempPasswordEmail };
