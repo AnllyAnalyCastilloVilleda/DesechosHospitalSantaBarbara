@@ -1,26 +1,19 @@
-// src/services/email.js  (ESM)
-import nodemailer from 'nodemailer';
+// src/services/email.js  (ESM) — usando API HTTP de Resend (sin SMTP)
+import { Resend } from 'resend';
 
 const APP_NAME = process.env.APP_NAME || 'Hospital Santa Bárbara';
 const APP_URL  = process.env.APP_URL  || 'http://localhost:5001';
-const FROM     = process.env.MAIL_FROM || 'notificaciones@hospitalsantabarbaramorales.com';
 
-// === Transporter usando Resend (SMTP correcto)
-const transporter = nodemailer.createTransport({
-  host: 'smtp.resend.com',
-  port: 587,          // 587 + STARTTLS recomendado
-  secure: false,      // true solo si usas 465
-  auth: {
-    user: 'resend',                 // <-- NO uses tu correo aquí
-    pass: process.env.RESEND_API_KEY,
-  },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 20000,
-  logger: true,
-  debug: true,
-});
+/**
+ * IMPORTANTE:
+ * MAIL_FROM debe ser un remitente de un dominio VERIFICADO en Resend.
+ * Ej: 'Hospital Santa Bárbara <noreply@hospitalsantabarbara.it.com>'
+ */
+const FROM = process.env.MAIL_FROM || 'Hospital Santa Bárbara <noreply@example.com>';
 
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+/* ---------------- Utilidades ---------------- */
 function escapeHtml(s = '') {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -98,21 +91,33 @@ function baseHtml({ title, greeting, intro, rows = [], cta, footerNote }) {
 </html>`;
 }
 
+/* ---------------- Envío por Resend (HTTP) ---------------- */
 async function sendMail({ to, subject, html, text }) {
   try {
-    const info = await transporter.sendMail({
-      from: `"${APP_NAME}" <${FROM}>`, // FROM debe ser un remitente de tu dominio verificado en Resend
-      to, subject, html, text,
+    // Acepta string o array para "to"
+    const toList = Array.isArray(to) ? to : [to];
+
+    const { data, error } = await resend.emails.send({
+      from: FROM,              // Debe ser dominio verificado
+      to: toList,
+      subject,
+      html,
+      text,
     });
-    return { ok: true, info };
+
+    if (error) {
+      console.error('Fallo al enviar correo (Resend API):', error);
+      return { ok: false, error: 'No se pudo enviar el correo en este momento.' };
+    }
+
+    return { ok: true, info: data };
   } catch (err) {
-    console.error('Fallo al enviar correo:', err);
-    // No rompas el flujo de tu API
+    console.error('Fallo al enviar correo (catch):', err);
     return { ok: false, error: 'No se pudo enviar el correo en este momento.' };
   }
 }
 
-/** Bienvenida / alta de usuario */
+/* ---------------- Emails concretos ---------------- */
 export async function sendNewUserEmail({ to, nombre, usuario, tempPassword, rolNombre }) {
   const safeNombre  = escapeHtml(nombre);
   const safeUsuario = escapeHtml(usuario);
@@ -146,7 +151,6 @@ export async function sendNewUserEmail({ to, nombre, usuario, tempPassword, rolN
   return sendMail({ to, subject: 'Tu acceso al sistema', html, text });
 }
 
-/** Reenvío de contraseña temporal */
 export async function sendTempPasswordEmail({ to, nombre, usuario, tempPassword, rolNombre }) {
   const safeNombre  = escapeHtml(nombre);
   const safeUsuario = escapeHtml(usuario);
