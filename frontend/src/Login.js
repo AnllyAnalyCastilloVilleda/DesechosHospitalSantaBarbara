@@ -360,9 +360,11 @@ export default function Login() {
 
     const t = setTimeout(async () => {
       try {
-        const { data } = await http.post(`/usuarios/${pwDialog.usuarioId}/validar-nueva`, {
-          actual, nueva
-        });
+        const { data } = await http.post(
+          `/usuarios/${pwDialog.usuarioId}/validar-nueva`,
+          { actual, nueva },
+          { skip401Redirect: true } // ✅ evitar redirect si backend respondiera 401 aquí
+        );
         if (!alive) return;
         if (data && typeof data.reutilizada === "boolean") {
           setReuseStatus(data.reutilizada ? "bad" : "ok");
@@ -387,7 +389,11 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const resp = await http.post("/usuarios/login", { usuario, contrasena });
+      const resp = await http.post(
+        "/usuarios/login",
+        { usuario, contrasena },
+        { skip401Redirect: true } // ✅ no redirigir en 401 del propio login
+      );
 
       // éxito normal: { ok:true, token, usuario }
       if (resp?.data?.token && resp?.data?.usuario) {
@@ -431,7 +437,11 @@ export default function Login() {
 
     setRecLoading(true);
     try {
-      const { data } = await http.post(`/usuarios/recuperar`, { usuario: u, correo: m });
+      const { data } = await http.post(
+        `/usuarios/recuperar`,
+        { usuario: u, correo: m },
+        { skip401Redirect: true } // ✅ evitar redirect en esta pública
+      );
 
       if (data?.ok || data?.code === "OK_SENT") {
         setRecOk(true);
@@ -480,7 +490,8 @@ export default function Login() {
     try {
       const { data } = await http.post(
         `/usuarios/${pwDialog.usuarioId}/cambiar-password-primera-vez`,
-        { actual, nueva }
+        { actual, nueva },
+        { skip401Redirect: true } // ✅ por consistencia en flujo de primera vez
       );
 
       if (data?.ok) {
