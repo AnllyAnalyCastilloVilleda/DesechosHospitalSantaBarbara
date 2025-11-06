@@ -1,4 +1,4 @@
-// src/config/api.js 
+// src/config/api.js
 import axios from "axios";
 
 /** Resuelve baseURL */
@@ -40,26 +40,28 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-// Control de 401 / errores
+// Control de 401 / errores (modo clásico)
 let IS_REDIRECTING_401 = false;
 http.interceptors.response.use(
   (res) => res,
   (err) => {
+    const cfg    = err?.config || {};
+    const url    = String(cfg?.url || "");
     const status = err?.response?.status ?? 0;
-    const code = err?.code;
-    const dataMsg = err?.response?.data?.mensaje || err?.response?.data?.message;
 
-    let message =
-      dataMsg ||
-      err?.message ||
-      (status === 0 ? "No se pudo conectar con el servidor" : "Error al comunicarse con el servidor");
+    // Permite saltar el redirect explícitamente en una petición
+    // p.ej. http.post("/usuarios/login", body, { skip401Redirect: true })
+    const skip401Redirect = cfg?.skip401Redirect === true;
 
-    if (code === "ECONNABORTED")       message = "Tiempo de espera agotado. Intenta de nuevo.";
-    else if (status === 403 && !dataMsg) message = "Permisos insuficientes para realizar esta acción.";
-    else if (status === 404 && !dataMsg) message = "Recurso no encontrado.";
-    else if (status >= 500 && !dataMsg) message = "Error interno del servidor.";
+    // Endpoints públicos que NO deben redirigir en 401
+    const isPublicAuth =
+      url.endsWith("/login") ||
+      url.endsWith("/usuarios/login") ||
+      url.endsWith("/auth/recuperar") ||
+      url.endsWith("/usuarios/recuperar") ||
+      /\/usuarios\/\d+\/validar-nueva$/.test(url);
 
-    if (status === 401) {
+    if (status === 401 && !skip401Redirect && !isPublicAuth) {
       try {
         localStorage.removeItem("token");
         localStorage.removeItem("usuario");
@@ -67,25 +69,16 @@ http.interceptors.response.use(
       } catch {}
       delete http.defaults.headers.common.Authorization;
 
-      if (!IS_REDIRECTING_401) {
+      if (!IS_REDIRECTING_401 && typeof window !== "undefined") {
         IS_REDIRECTING_401 = true;
-        const here =
-          typeof window !== "undefined"
-            ? window.location.pathname + window.location.search
-            : "/";
-        if (typeof window !== "undefined") {
-          const qs = new URLSearchParams({ expired: "1", next: here }).toString();
-          window.location.href = `/login?${qs}`;
-        }
+        const here = window.location.pathname + window.location.search;
+        const qs = new URLSearchParams({ expired: "1", next: here }).toString();
+        window.location.href = `/login?${qs}`;
       }
     }
 
-    return Promise.reject({
-      status,
-      code,
-      message,
-      _raw: err?.response?.data,
-    });
+    // 👉 devolvemos el error ORIGINAL de Axios, sin transformar
+    return Promise.reject(err);
   }
 );
 
