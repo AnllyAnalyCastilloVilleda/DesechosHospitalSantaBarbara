@@ -13,7 +13,7 @@ function resolveApiUrl() {
 
   return isLocal
     ? "http://localhost:5000"
-    : "https://desechoshospitalsantabarbara-production.up.railway.app";
+    : "https://desechoshospitalsantabarbara-production.up.railway.app/api";
 }
 
 const BASE_URL = resolveApiUrl();
