@@ -1,19 +1,28 @@
 // src/config/api.js
 import axios from "axios";
 
-/** Resuelve baseURL */
-function resolveApiUrl() {
-  const fromEnv = (process.env.REACT_APP_API_URL || "").trim().replace(/\/+$/, "");
-  if (fromEnv) return fromEnv;
+/** Asegura que la URL termine con /api (una sola vez) */
+function withApiSuffix(url = "") {
+  const base = String(url || "").trim().replace(/\/+$/, ""); // sin slashes al final
+  return base.endsWith("/api") ? base : `${base}/api`;
+}
 
-  // fallback: en dev local => localhost:5000; en producción => Railway
+/** Resuelve baseURL final (con /api) */
+function resolveApiUrl() {
+  const fromEnv = (process.env.REACT_APP_API_URL || "").trim();
+  if (fromEnv) {
+    // Si en el env ya pusiste .../api, se respeta; si no, se agrega
+    return withApiSuffix(fromEnv);
+  }
+
+  // Fallback: en dev → localhost:5000/api ; en prod → Railway/api
   const isLocal =
     typeof window !== "undefined" &&
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
   return isLocal
-    ? "http://localhost:5000"
-    : "https://desechoshospitalsantabarbara-production.up.railway.app/api";
+    ? withApiSuffix("http://localhost:5000")
+    : withApiSuffix("https://desechoshospitalsantabarbara-production.up.railway.app");
 }
 
 const BASE_URL = resolveApiUrl();
@@ -24,20 +33,26 @@ const http = axios.create({
   timeout: 15000, // 15s
 });
 
+/* ===== Interceptores ===== */
+
+// Inyecta token ANTES del logger (opcional, pero así ya va listo al momento de loguear)
+http.interceptors.request.use((config) => {
+  try {
+    const t = localStorage.getItem("token");
+    if (t) config.headers.Authorization = `Bearer ${t}`;
+    else delete config.headers.Authorization;
+  } catch {
+    // ignore
+  }
+  return config;
+});
+
 // Logs útiles
 console.info("[API] baseURL =", http.defaults.baseURL);
 http.interceptors.request.use((cfg) => {
   const full = (cfg.baseURL || "") + (cfg.url || "");
-  console.log("[HTTP] ->", cfg.method?.toUpperCase(), full);
+  console.log("[HTTP] ->", (cfg.method || "GET").toUpperCase(), full);
   return cfg;
-});
-
-// Inyecta token
-http.interceptors.request.use((config) => {
-  const t = localStorage.getItem("token");
-  if (t) config.headers.Authorization = `Bearer ${t}`;
-  else delete config.headers.Authorization;
-  return config;
 });
 
 // Control de 401 / errores (modo clásico)
@@ -67,7 +82,7 @@ http.interceptors.response.use(
         localStorage.removeItem("usuario");
         localStorage.removeItem("permisos");
       } catch {}
-      delete http.defaults.headers.common.Authorization;
+      delete http.defaults.headers.common?.Authorization;
 
       if (!IS_REDIRECTING_401 && typeof window !== "undefined") {
         IS_REDIRECTING_401 = true;
@@ -86,7 +101,10 @@ http.interceptors.response.use(
 try {
   const t = localStorage.getItem("token");
   if (t) http.defaults.headers.common.Authorization = `Bearer ${t}`;
-} catch {}
+} catch {
+  // ignore
+}
 
 export { http };
 export default http;
+
