@@ -107,4 +107,3 @@ try {
 
 export { http };
 export default http;
-
