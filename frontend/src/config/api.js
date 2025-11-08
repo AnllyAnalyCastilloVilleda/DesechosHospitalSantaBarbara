@@ -7,14 +7,6 @@ function withApiSuffix(url = "") {
   return base.endsWith("/api") ? base : `${base}/api`;
 }
 
-/** Resuelve baseURL final (con /api) */
-function resolveApiUrl() {
-  const fromEnv = (process.env.REACT_APP_API_URL || "").trim();
-  if (fromEnv) {
-    // Si en el env ya pusiste .../api, se respeta; si no, se agrega
-    return withApiSuffix(fromEnv);
-  }
-
   // Fallback: en dev → localhost:5000/api ; en prod → Railway/api
   const isLocal =
     typeof window !== "undefined" &&
