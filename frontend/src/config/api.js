@@ -1,35 +1,30 @@
 // frontend/src/config/api.js
 import axios from "axios";
 
-/** Asegura que la URL termine con /api (una sola vez) */
-function withApiSuffix(url = "") {
-  const base = String(url || "").trim().replace(/\/+$/, ""); // quita slashes al final
-  return base.endsWith("/api") ? base : `${base}/api`;
-}
-
-/** Resuelve la base URL del backend de forma consistente */
+/** Resuelve la base URL del backend (SIN /api) */
 function resolveApiUrl() {
-  // Si viene de Netlify (.env: REACT_APP_API_URL), la usamos
-  const fromEnv = (process.env.REACT_APP_API_URL || "").trim();
-  if (fromEnv) return withApiSuffix(fromEnv);
+  // Lee de variables de entorno (Netlify/Cra/Vite)
+  const fromEnv = (process.env.REACT_APP_API_URL || process.env.VITE_API_URL || "")
+    .trim()
+    .replace(/\/+$/, ""); // quita slashes al final
 
-  // Fallback: en dev → localhost:5000 ; en prod → Railway
+  if (fromEnv) return fromEnv; // ⬅️ debe venir SIN /api
+
+  // Fallback: dev local vs producción (Railway)
   const isLocal =
     typeof window !== "undefined" &&
     (window.location.hostname === "localhost" ||
       window.location.hostname === "127.0.0.1");
 
-  const base = isLocal
-    ? "http://localhost:5000"
-    : "https://desechoshospitalsantabarbara-production.up.railway.app";
-
-  return withApiSuffix(base);
+  return isLocal
+    ? "http://localhost:5000" // ⬅️ sin /api
+    : "https://desechoshospitalsantabarbara-production.up.railway.app"; // ⬅️ sin /api
 }
 
 const BASE_URL = resolveApiUrl();
 
 const http = axios.create({
-  baseURL: BASE_URL,
+  baseURL: BASE_URL, // ⬅️ SIN /api
   withCredentials: false,
   timeout: 15000,
 });
@@ -69,6 +64,7 @@ http.interceptors.response.use(
 
     const skip401Redirect = cfg?.skip401Redirect === true;
 
+    // Rutas públicas (no redirigir)
     const isPublicAuth =
       url.endsWith("/login") ||
       url.endsWith("/usuarios/login") ||
@@ -96,7 +92,7 @@ http.interceptors.response.use(
   }
 );
 
-// Si ya hay token guardado, déjalo en default headers al cargar
+// Si ya hay token guardado, deja el default
 try {
   const t = localStorage.getItem("token");
   if (t) http.defaults.headers.common.Authorization = `Bearer ${t}`;
