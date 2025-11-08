@@ -1,9 +1,10 @@
 // src/Estadisticas.js
 import React, { useMemo, useRef } from "react";
-import { Pie } from "react-chartjs-2";
+import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import * as XLSX from "xlsx";
 import "./Estadisticas.css";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -11,26 +12,64 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 export default function Estadisticas() {
   const chartBoxRef = useRef(null);
 
-  // Datos base (puedes reemplazar por props o estado)
+  // ===========================
+  // Datos base (categorías)
+  // ===========================
   const labels = ["Infeccioso", "Común", "Punzocortante", "Patológico", "Especiales"];
-  const valores = [40, 25, 15, 30, 20];
+  const valores = [40, 25, 15, 30, 20]; // kg por categoría
+  const colores = ["#ff6384", "#36a2eb", "#ffcd56", "#4bc0c0", "#a167e7"];
 
-  // Total y % por categoría (para etiqueta central y tooltip)
   const total = useMemo(() => valores.reduce((a, b) => a + b, 0), [valores]);
   const porcentajes = useMemo(
-    () => valores.map((v) => (total ? ((v / total) * 100).toFixed(1) : 0)),
+    () => valores.map((v) => (total ? ((v / total) * 100).toFixed(1) : "0.0")),
     [valores, total]
   );
 
-  // Dataset Chart.js (anillo con "cutout")
-  const data = useMemo(
+  // ===========================
+  // Detalle por áreas (tabla y Excel)
+  // ===========================
+  // Distribución coherente a partir de totales por categoría
+  const areas = ["Emergencias", "Quirófano", "Laboratorio", "Pediatría", "UCIMED", "Medicina Interna"];
+  const factores = [
+    [0.28, 0.18, 0.20, 0.22, 0.12], // Emergencias reparte % de cada categoría
+    [0.22, 0.16, 0.25, 0.24, 0.13], // Quirófano
+    [0.17, 0.21, 0.18, 0.20, 0.24], // Laboratorio
+    [0.12, 0.17, 0.12, 0.15, 0.22], // Pediatría
+    [0.11, 0.15, 0.15, 0.11, 0.16], // UCIMED
+    [0.10, 0.13, 0.10, 0.08, 0.13], // Medicina Interna
+  ];
+  const detalleAreas = useMemo(() => {
+    // matriz áreas x categorías (kg)
+    return areas.map((area, r) => {
+      const fila = { Área: area };
+      labels.forEach((cat, c) => {
+        const kg = Math.round(valores[c] * (factores[r][c] ?? 0));
+        fila[cat] = kg;
+      });
+      fila.Total = labels.reduce((a, cat) => a + (fila[cat] || 0), 0);
+      return fila;
+    });
+  }, [areas, labels, valores]);
+
+  // Serie mensual (12m) estimada a partir del total y una variación leve
+  const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const mensual = useMemo(() => {
+    const base = Math.round(total / 12);
+    const variaciones = [1.02, 0.98, 1.04, 1.00, 1.06, 0.95, 1.08, 1.03, 0.97, 1.05, 1.01, 1.02];
+    return meses.map((m, i) => ({ Mes: m, Kg: Math.round(base * variaciones[i]) }));
+  }, [total]);
+
+  // ===========================
+  // Chart.js (doughnut)
+  // ===========================
+  const chartData = useMemo(
     () => ({
       labels,
       datasets: [
         {
           label: "Cantidad (kg)",
           data: valores,
-          backgroundColor: ["#ff6384", "#36a2eb", "#ffcd56", "#4bc0c0", "#a167e7"],
+          backgroundColor: colores,
           borderColor: "rgba(0,0,0,.08)",
           borderWidth: 1,
           hoverOffset: 8,
@@ -40,11 +79,12 @@ export default function Estadisticas() {
     [labels, valores]
   );
 
-  const options = useMemo(
+  const chartOptions = useMemo(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
       layout: { padding: 8 },
+      cutout: "60%",
       plugins: {
         legend: {
           position: "right",
@@ -59,19 +99,16 @@ export default function Estadisticas() {
             label: (ctx) => {
               const v = ctx.parsed;
               const i = ctx.dataIndex;
-              const p = porcentajes[i];
-              return ` ${labels[i]}: ${v} kg (${p}%)`;
+              return ` ${labels[i]}: ${v} kg (${porcentajes[i]}%)`;
             },
           },
         },
       },
       elements: { arc: { borderJoinStyle: "round" } },
-      cutout: "60%",
     }),
     [labels, porcentajes]
   );
 
-  // Renderizamos el número total dentro del anillo
   const CenterLabel = () => (
     <div className="center-label" aria-hidden="true">
       <div className="center-total">{total} kg</div>
@@ -79,7 +116,9 @@ export default function Estadisticas() {
     </div>
   );
 
-  // Exportación a PDF (A4 alta calidad, adapta el canvas al ancho de página)
+  // ===========================
+  // Exportar PDF (A4 nítido)
+  // ===========================
   const exportPDF = async () => {
     try {
       const input = chartBoxRef.current;
@@ -87,25 +126,37 @@ export default function Estadisticas() {
 
       const canvas = await html2canvas(input, {
         backgroundColor: "#ffffff",
-        scale: 2, // mejora nitidez
+        scale: 3, // más nitidez
+        useCORS: true,
       });
 
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
 
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgWidth = pageWidth - 20; // márgenes
-      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
-      const y = 12;
+      // Título
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(14);
-      pdf.text("Estadísticas Generales — Distribución por tipo de desecho", 10, 10);
+      pdf.setFontSize(16);
+      pdf.text("Estadísticas Generales", 10, 12);
 
-      pdf.addImage(imgData, "PNG", 10, y + 2, imgWidth, Math.min(imgHeight, pageHeight - y - 10));
+      // Subtítulo con fecha
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      const hoy = new Date();
+      const fecha = hoy.toLocaleString("es-GT", { dateStyle: "medium", timeStyle: "short" });
+      pdf.text(`Generado: ${fecha}`, 10, 18);
+
+      // Imagen del dashboard
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgW = pageW - 20;
+      const imgH = (imgProps.height * imgW) / imgProps.width;
+      pdf.addImage(imgData, "PNG", 10, 22, imgW, Math.min(imgH, pageH - 30));
+
+      // Pie de página
+      pdf.setFontSize(9);
+      pdf.text("Hospital Santa Bárbara — Estadística de Residuos", 10, pageH - 6);
+
       pdf.save("estadisticas_desechos.pdf");
     } catch (err) {
       console.error(err);
@@ -113,101 +164,127 @@ export default function Estadisticas() {
     }
   };
 
-  // Exportación CSV simple (labels, kg, %)
-  const exportCSV = () => {
+  // ===========================
+  // Exportar Excel (.xlsx)
+  // ===========================
+  const exportExcel = () => {
     try {
-      const rows = [["Tipo", "Kg", "Porcentaje"]];
-      labels.forEach((l, i) => rows.push([l, String(valores[i]), `${porcentajes[i]}%`]));
-      rows.push(["TOTAL", String(total), "100%"]);
+      // Hoja 1: Resumen
+      const resumen = [["Tipo", "Kg", "%"]];
+      labels.forEach((l, i) => resumen.push([l, valores[i], Number(porcentajes[i])]));
+      resumen.push(["TOTAL", total, 100]);
 
-      const csv = rows.map((r) => r.map((c) => `"${String(c).replaceAll('"', '""')}"`).join(",")).join("\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "estadisticas_desechos.csv";
-      a.click();
-      URL.revokeObjectURL(url);
+      // Hoja 2: Áreas (detalleAreas ya está con claves amigables)
+      const areasRows = detalleAreas.map((row) => row);
+
+      // Hoja 3: Mensual
+      const mensualRows = mensual.map((r) => r);
+
+      const wb = XLSX.utils.book_new();
+      const ws1 = XLSX.utils.aoa_to_sheet(resumen);
+      const ws2 = XLSX.utils.json_to_sheet(areasRows);
+      const ws3 = XLSX.utils.json_to_sheet(mensualRows);
+
+      // Formatos mínimos: columnas anchas
+      ws1["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 8 }];
+      ws2["!cols"] = [{ wch: 20 }, ...labels.map(() => ({ wch: 14 })), { wch: 12 }];
+      ws3["!cols"] = [{ wch: 10 }, { wch: 10 }];
+
+      XLSX.utils.book_append_sheet(wb, ws1, "Resumen");
+      XLSX.utils.book_append_sheet(wb, ws2, "Áreas");
+      XLSX.utils.book_append_sheet(wb, ws3, "Mensual");
+
+      XLSX.writeFile(wb, "estadisticas_desechos.xlsx", { compression: true });
     } catch (e) {
       console.error(e);
-      alert("No se pudo exportar el CSV.");
+      alert("No se pudo exportar el Excel.");
     }
-  };
-
-  // Predicción simulada con un pequeño cálculo en vez de solo alerta fija
-  const predecirEstadisticas = () => {
-    // Regla visual: +10% infeccioso, +5% patológico, -3% común, resto estable
-    const proy = {
-      Infeccioso: Math.round(valores[0] * 1.10),
-      Común: Math.round(valores[1] * 0.97),
-      Punzocortante: Math.round(valores[2] * 1.00),
-      Patológico: Math.round(valores[3] * 1.05),
-      Especiales: Math.round(valores[4] * 1.00),
-    };
-    const totalNext = Object.values(proy).reduce((a, b) => a + b, 0);
-    const msg = [
-      "📈 Predicción simulada (próximo mes):",
-      `• Infeccioso: ${proy.Infeccioso} kg (+10%)`,
-      `• Común: ${proy.Común} kg (−3%)`,
-      `• Punzocortante: ${proy.Punzocortante} kg (≈)`,
-      `• Patológico: ${proy.Patológico} kg (+5%)`,
-      `• Especiales: ${proy.Especiales} kg (≈)`,
-      `Total estimado: ${totalNext} kg`,
-    ].join("\n");
-    alert(msg);
   };
 
   return (
     <div className="estadisticas-container">
-      <header className="estadisticas-header">
-        <h2>📊 Estadísticas Generales</h2>
-        <p className="sub">
-          Vista ilustrativa 100% frontend. Puedes reemplazar los datos por valores reales cuando el backend esté listo.
-        </p>
-      </header>
+      <h2>📊 Estadísticas Generales</h2>
 
-      <section
-        ref={chartBoxRef}
-        className="grafico-box"
-        aria-label="Sección del gráfico de distribución por tipo de desecho"
-      >
-        <h3>Distribución por tipo de desecho</h3>
-        <div
-          className="grafico-wrapper"
-          role="img"
-          aria-label="Gráfico de anillo de distribución por tipo de desecho"
-        >
-          <Pie data={data} options={options} />
+      <div ref={chartBoxRef} className="chart-box" aria-label="Distribución por tipo de desecho">
+        <div style={{ position: "relative", height: 360 }}>
+          <Doughnut data={chartData} options={chartOptions} />
           <CenterLabel />
         </div>
 
-        <div className="resumen">
-          {labels.map((l, i) => (
-            <div className="resumen-item" key={l}>
-              <span className="resumen-color" style={{ background: data.datasets[0].backgroundColor[i] }} />
-              <span className="resumen-label">{l}</span>
-              <span className="resumen-value">{valores[i]} kg</span>
-              <span className="resumen-pct">{porcentajes[i]}%</span>
-            </div>
-          ))}
-          <div className="resumen-item total">
-            <span className="resumen-label">TOTAL</span>
-            <span className="resumen-value">{total} kg</span>
-            <span className="resumen-pct">100%</span>
+        {/* Resumen tabular visible y limpio para PDF */}
+        <div style={{ marginTop: 18 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ textAlign: "left" }}>
+                <th style={{ padding: "8px 6px" }}>Tipo</th>
+                <th style={{ padding: "8px 6px" }}>Kg</th>
+                <th style={{ padding: "8px 6px" }}>%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {labels.map((l, i) => (
+                <tr key={l} style={{ borderTop: "1px solid rgba(0,0,0,.06)" }}>
+                  <td style={{ padding: "8px 6px" }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: colores[i],
+                        marginRight: 8,
+                        verticalAlign: "middle",
+                      }}
+                    />
+                    {l}
+                  </td>
+                  <td style={{ padding: "8px 6px" }}>{valores[i]} kg</td>
+                  <td style={{ padding: "8px 6px" }}>{porcentajes[i]}%</td>
+                </tr>
+              ))}
+              <tr style={{ borderTop: "2px solid rgba(0,0,0,.12)", fontWeight: 700 }}>
+                <td style={{ padding: "8px 6px" }}>TOTAL</td>
+                <td style={{ padding: "8px 6px" }}>{total} kg</td>
+                <td style={{ padding: "8px 6px" }}>100%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Detalle por áreas */}
+        <div style={{ marginTop: 22 }}>
+          <h4 style={{ margin: "0 0 8px 0" }}>Detalle por áreas</h4>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ minWidth: 680, width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ textAlign: "left" }}>
+                  <th style={{ padding: "8px 6px" }}>Área</th>
+                  {labels.map((l) => (
+                    <th key={l} style={{ padding: "8px 6px" }}>{l} (kg)</th>
+                  ))}
+                  <th style={{ padding: "8px 6px" }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detalleAreas.map((r) => (
+                  <tr key={r["Área"]} style={{ borderTop: "1px solid rgba(0,0,0,.06)" }}>
+                    <td style={{ padding: "8px 6px" }}>{r["Área"]}</td>
+                    {labels.map((l) => (
+                      <td key={l} style={{ padding: "8px 6px" }}>{r[l]}</td>
+                    ))}
+                    <td style={{ padding: "8px 6px", fontWeight: 600 }}>{r.Total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      </section>
+
+      </div>
 
       <div className="botones-estadisticas">
-        <button className="btn-guardar" onClick={exportPDF}>
-          Guardar como PDF
-        </button>
-        <button className="btn-predecir" onClick={predecirEstadisticas}>
-          Predecir estadísticas futuras
-        </button>
-        <button className="btn-csv" onClick={exportCSV}>
-          Exportar CSV
-        </button>
+        <button onClick={exportPDF}>Descargar PDF</button>
+        <button onClick={exportExcel}>Descargar Excel</button>
       </div>
     </div>
   );
