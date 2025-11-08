@@ -9,6 +9,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Server as SocketIOServer } from 'socket.io';
+import cors from 'cors';
 
 // ===== Servicios =====
 import * as emailSvc from './src/services/email.js'; // ESM
@@ -57,8 +58,6 @@ const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'secreto123';
 const SCALE_ENABLED = process.env.SCALE_ENABLED !== 'false'; // por defecto true
 
-import cors from 'cors';
-
 const ALLOWED_ORIGINS = [
   'https://gestion-desechos-hospital.netlify.app',
   'http://localhost:3000',
@@ -67,7 +66,7 @@ const ALLOWED_ORIGINS = [
 
 app.use(cors({
   origin(origin, cb) {
-    if (!origin) return cb(null, true);                   // Postman/cURL
+    if (!origin) return cb(null, true); // Postman/cURL
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
     return cb(new Error('Not allowed by CORS: ' + origin));
   },
@@ -88,13 +87,11 @@ app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // Servir archivos subidos (legacy)
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-
-// Servir PDFs y otros archivos guardados por el backend
 app.use('/files', express.static(path.join(process.cwd(), 'files'), {
   fallthrough: true,
   maxAge: '1y',
 }));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 /* ==============================
    Rutas públicas mínimas (sin /api para probes)
@@ -144,14 +141,60 @@ app.get('/health/db', async (_req, res) => {
 })();
 
 /* ==============================
-   Middlewares de Auth & Permisos
+   (Paso 2) Asegurar que Admin tenga todos los permisos
    ============================== */
-function auth(req, res, next) {
+(async function ensureAdminHasAllPerms() {
+  try {
+    const adminRole = await prisma.rol.findFirst({
+      where: { nombre: { in: ['ADMIN', 'Administrador', 'SuperAdmin', 'SUPERADMIN'] } },
+      select: { id: true, nombre: true },
+    });
+    if (!adminRole) {
+      console.warn('[BOOT] No se encontró un rol ADMIN/Administrador/SuperAdmin.');
+      return;
+    }
+
+    const perms = await prisma.permiso.findMany({ select: { id: true } });
+    if (!perms.length) return;
+
+    await prisma.$transaction(
+      perms.map(p =>
+        prisma.permisoPorRol.upsert({
+          where: { rolId_permisoId: { rolId: adminRole.id, permisoId: p.id } },
+          update: {},
+          create: { rolId: adminRole.id, permisoId: p.id },
+        })
+      )
+    );
+    console.log(`[BOOT] Rol "${adminRole.nombre}" ahora tiene ${perms.length} permisos.`);
+  } catch (e) {
+    console.error('[BOOT] No se pudo asignar permisos al rol admin:', e?.message || e);
+  }
+})();
+
+/* ==============================
+   (Paso 1) Middlewares de Auth & Permisos
+   ============================== */
+async function auth(req, res, next) {
   const hdr = req.headers.authorization || '';
   const token = hdr.startsWith('Bearer ') ? hdr.slice(7) : null;
   if (!token) return res.status(401).json({ mensaje: 'Token requerido' });
+
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = payload; // { id, usuario, rol, rolId, permisos? }
+
+    // Rehidrata permisos desde la BD si no vienen o están vacíos
+    if (!Array.isArray(req.user.permisos) || req.user.permisos.length === 0) {
+      const u = await prisma.usuario.findUnique({
+        where: { id: payload.id },
+        include: { rol: { include: { permisos: { include: { permiso: true } } } } },
+      });
+      req.user.permisos = (u?.rol?.permisos || []).map(rp => rp.permiso.nombre);
+      req.user.rol = u?.rol?.nombre || req.user.rol;
+      req.user.rolId = u?.rolId ?? req.user.rolId;
+    }
+
     next();
   } catch {
     return res.status(401).json({ mensaje: 'Token inválido/expirado' });
@@ -160,6 +203,10 @@ function auth(req, res, next) {
 
 function requirePerm(perm) {
   return (req, res, next) => {
+    // bypass para roles con "ADMIN" en el nombre
+    const nombreRol = String(req.user?.rol || '').toUpperCase();
+    if (nombreRol.includes('ADMIN')) return next();
+
     const perms = req.user?.permisos || [];
     const needed = Array.isArray(perm) ? perm : [perm];
     const ok = needed.some((p) => perms.includes(p));
