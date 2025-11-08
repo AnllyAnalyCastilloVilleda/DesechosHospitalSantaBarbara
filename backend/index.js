@@ -160,9 +160,10 @@ app.get('/health/db', async (_req, res) => {
     await prisma.$transaction(
       perms.map(p =>
         prisma.permisoPorRol.upsert({
-          where: { rolId_permisoId: { rolId: adminRole.id, permisoId: p.id } },
+          // ✅ nombre correcto y orden correcto (permisoId luego rolId)
+          where: { permisoId_rolId: { permisoId: p.id, rolId: adminRole.id } },
           update: {},
-          create: { rolId: adminRole.id, permisoId: p.id },
+          create: { permisoId: p.id, rolId: adminRole.id },
         })
       )
     );
