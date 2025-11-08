@@ -1,84 +1,79 @@
 // frontend/src/config/api.js
 import axios from "axios";
 
-/* ================ Helpers de token ================ */
-
-/** Lee y normaliza el token del localStorage */
+/* ================ Helpers ================ */
 function readToken() {
   try {
     let raw = localStorage.getItem("token") || "";
-    // quita comillas si lo guardaron como JSON.stringify(token)
-    raw = raw.replace(/^"+|"+$/g, "");
-    // si viene "Bearer xxx" deja solo el jwt
-    raw = raw.replace(/^Bearer\s+/i, "");
+    raw = raw.replace(/^"+|"+$/g, "");           // quita comillas
+    raw = raw.replace(/^Bearer\s+/i, "");        // quita "Bearer "
     return raw.trim();
-  } catch {
-    return "";
-  }
+  } catch { return ""; }
 }
-
-/** Decodifica (best-effort) el payload del JWT para ver exp */
 function decodeJwtPayload(jwt = "") {
   try {
-    const parts = jwt.split(".");
-    if (parts.length < 2) return null;
-    const json = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+    const p = jwt.split(".");
+    if (p.length < 2) return null;
+    const json = atob(p[1].replace(/-/g, "+").replace(/_/g, "/"));
     return JSON.parse(decodeURIComponent(escape(json)));
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
-
-/** Devuelve true si el token está caducado (exp < ahora) */
 function isExpired(jwt = "") {
-  const p = decodeJwtPayload(jwt);
-  if (!p || !p.exp) return false;
-  const now = Math.floor(Date.now() / 1000);
-  return p.exp <= now;
+  const pl = decodeJwtPayload(jwt);
+  if (!pl || !pl.exp) return false;
+  return pl.exp <= Math.floor(Date.now() / 1000);
 }
 
-/* ================ Resolución de baseURL ================ */
+/** Prefija /api si hace falta (no toca URLs absolutas ni las que ya empiezan con /api) */
+function ensureApiPath(url = "") {
+  if (!url) return url;
+  if (/^https?:\/\//i.test(url)) return url;         // absoluta → no tocar
+  if (url.startsWith("/")) return url.startsWith("/api") ? url : "/api" + url;
+  // relativa: "usuarios/..." -> "/api/usuarios/..."
+  return url.startsWith("api/") ? "/" + url : "/api/" + url;
+}
 
-/** Resuelve la base URL del backend (SIN /api) */
+/** Resuelve baseURL del backend (SIN /api) */
 function resolveApiUrl() {
   const fromEnv = (process.env.REACT_APP_API_URL || process.env.VITE_API_URL || "")
     .trim()
-    .replace(/\/+$/, ""); // sin slash final
+    .replace(/\/+$/, "");
   if (fromEnv) return fromEnv;
 
   const isLocal =
     typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1");
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
   return isLocal
     ? "http://localhost:5000"
     : "https://desechoshospitalsantabarbara-production.up.railway.app";
 }
 
-const BASE_URL = resolveApiUrl();
-
 const http = axios.create({
-  baseURL: BASE_URL, // SIN /api; las rutas sí empiezan con /api
+  baseURL: resolveApiUrl(),   // SIN /api
   withCredentials: false,
   timeout: 15000,
 });
 
 /* ================ Interceptores ================ */
 
-// Inyecta token (normalizado) ANTES del logger
+// Inyecta token y corrige path ANTES del logger
 http.interceptors.request.use((config) => {
+  // 1) token
   const jwt = readToken();
   if (jwt && !isExpired(jwt)) {
     config.headers.Authorization = `Bearer ${jwt}`;
   } else {
-    // asegúrate de no mandar Authorization inválido
     delete config.headers.Authorization;
+  }
+  // 2) asegurar /api en rutas relativas
+  if (!config.noApiPrefix) {
+    config.url = ensureApiPath(config.url || "");
   }
   return config;
 });
 
-// Logger útil
+// Logger
 http.interceptors.request.use((cfg) => {
   try {
     const full = (cfg.baseURL || "") + (cfg.url || "");
@@ -88,7 +83,7 @@ http.interceptors.request.use((cfg) => {
   return cfg;
 });
 
-// Manejo de 401 y expiración
+// 401 + expiración
 let IS_REDIRECTING_401 = false;
 http.interceptors.response.use(
   (res) => res,
@@ -96,7 +91,6 @@ http.interceptors.response.use(
     const cfg = err?.config || {};
     const url = String(cfg?.url || "");
     const status = err?.response?.status ?? 0;
-
     const skip401Redirect = cfg?.skip401Redirect === true;
 
     const isPublicAuth =
@@ -106,7 +100,6 @@ http.interceptors.response.use(
       url.endsWith("/usuarios/recuperar") ||
       /\/usuarios\/\d+\/validar-nueva$/.test(url);
 
-    // si recibimos 401 o detectamos token expirado, limpiamos y redirigimos
     const jwt = readToken();
     const expired = isExpired(jwt);
 
@@ -121,8 +114,7 @@ http.interceptors.response.use(
       if (!IS_REDIRECTING_401 && typeof window !== "undefined") {
         IS_REDIRECTING_401 = true;
         const here = window.location.pathname + window.location.search;
-        const params = { expired: expired ? "1" : "0", next: here };
-        const qs = new URLSearchParams(params).toString();
+        const qs = new URLSearchParams({ expired: expired ? "1" : "0", next: here }).toString();
         window.location.href = `/login?${qs}`;
       }
     }
@@ -131,7 +123,7 @@ http.interceptors.response.use(
   }
 );
 
-// Carga inicial del header por si ya había token
+// Carga inicial del header
 try {
   const jwt = readToken();
   if (jwt && !isExpired(jwt)) {
