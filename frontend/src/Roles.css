@@ -288,3 +288,46 @@
   .perm-toolbar .btn-outline-secondary { min-width: 150px; }
   .perm-toolbar .btn-primary          { min-width: 170px; }
 }
+
+/* ===== PARCHE VISIBILIDAD Y CONTRASTE (poner AL FINAL de Roles.css) ===== */
+
+/* 1) Que los botones SIEMPRE muestren el texto */
+.btn { color: #0f172a; }                       /* color base oscuro */
+.btn.btn-primary { color: #fff; background: var(--brand); border-color: var(--brand); }
+.btn.btn-primary:hover { filter: brightness(.96); }
+.btn.btn-outline-secondary { color:#334155; background:#fff; border-color:#cbd5e1; }
+.btn.btn-outline-secondary:hover { background:#f8fafc; border-color:#94a3b8; color:#0f172a; }
+
+/* 2) Botón "Ver deshabilitados" (era casi invisible) */
+.btn-ghost-light{
+  background: rgba(88,102,242,.12);   /* leve tono de la marca */
+  color: #334155;                     /* texto oscuro legible */
+  border: 1px solid rgba(88,102,242,.25);
+}
+.btn-ghost-light:hover{
+  background: rgba(88,102,242,.20);
+  border-color: rgba(88,102,242,.35);
+}
+
+/* 3) Evitar que algo lo ponga blanco al cambiar de rol (p.ej. Guardar cambios) */
+.perm-toolbar .btn { color: inherit !important; }
+.perm-toolbar .btn.btn-primary { color:#fff !important; }
+
+/* 4) Estado deshabilitado legible */
+.btn:disabled, .btn.disabled { opacity: .85 !important; }
+.btn-primary:disabled{
+  background-color:#4f7cff !important; border-color:#4f7cff !important; color:#fff !important;
+}
+.btn-outline-secondary:disabled{
+  background-color:#e9ecef !important; border-color:#d1d5db !important; color:#475569 !important;
+}
+
+/* 5) Inputs y placeholders (el de "Nombre del nuevo rol...") */
+input.form-control, .form-control { color:#0f172a; }
+input::placeholder, .form-control::placeholder { color:#6b7280; opacity:1; }
+
+/* 6) Evitar herencias de color blanco desde items seleccionados */
+.list-group .list-group-item.selected-role .btn { color: inherit; }
+.list-group .list-group-item.selected-role .btn.btn-outline-primary { color:#3f5bff !important; }
+.list-group .list-group-item.selected-role .btn.btn-outline-danger  { color:#e03131 !important; }
+
