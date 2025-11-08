@@ -331,3 +331,23 @@ input::placeholder, .form-control::placeholder { color:#6b7280; opacity:1; }
 .list-group .list-group-item.selected-role .btn.btn-outline-primary { color:#3f5bff !important; }
 .list-group .list-group-item.selected-role .btn.btn-outline-danger  { color:#e03131 !important; }
 
+/* ===== Visibilidad en barra bloqueada (Superadmin) ===== */
+.perm-toolbar.locked-toolbar .btn {
+  opacity: 1 !important;            /* no deslavado */
+  cursor: not-allowed !important;    /* deja claro que no se puede */
+}
+
+/* Outline deshabilitados (Seleccionar/Quitar todo) */
+.perm-toolbar.locked-toolbar .btn.btn-outline-secondary:disabled {
+  background: #e9ecef !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;         /* texto oscuro legible */
+}
+
+/* Primario deshabilitado (Guardar cambios) */
+.perm-toolbar.locked-toolbar .btn.btn-primary:disabled {
+  background: #8ea2ff !important;    /* azul medio */
+  border-color: #7e91ff !important;
+  color: #fff !important;             /* blanco sobre azul medio */
+}
+
