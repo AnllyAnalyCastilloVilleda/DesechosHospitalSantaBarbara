@@ -83,20 +83,22 @@ function isValidEmail(s = "") {
 }
 
 /* ============ Formulario (sin contraseñas) ============ */
-function UsuarioForm({ initial = {}, roles = [], onSubmit, loading, excludeId, mode = "create" }) {
+// ⚠️ OJO: SIN default {} en `initial` para no disparar el useEffect cada render.
+function UsuarioForm({ initial, roles = [], onSubmit, loading, excludeId, mode = "create" }) {
   const [f, setF] = useState({
     nombre: "",
     usuario: "",
     correo: "",
-    rolId: "",
-    ...initial,
+    rolId: "",           // string para el <select>
+    ...(initial || {}),
   });
 
+  // Normaliza rolId solo cuando EDITAS (cuando sí hay initial)
   useEffect(() => {
+    if (!initial) return; // ← evita reseteos en "crear"
     setF(s => ({
       ...s,
       ...initial,
-      // normaliza rolId a string para que el <select> no parpadee
       rolId: initial.rolId != null ? String(initial.rolId) : "",
     }));
   }, [initial]);
@@ -115,8 +117,8 @@ function UsuarioForm({ initial = {}, roles = [], onSubmit, loading, excludeId, m
   useEffect(() => {
     let cancel = false;
     async function check() {
-      const sameUsuario = (initial.usuario || "").toLowerCase() === (f.usuario || "").toLowerCase();
-      const sameCorreo  = (initial.correo  || "").toLowerCase() === (f.correo  || "").toLowerCase();
+      const sameUsuario = (initial?.usuario || "").toLowerCase() === (f.usuario || "").toLowerCase();
+      const sameCorreo  = (initial?.correo  || "").toLowerCase() === (f.correo  || "").toLowerCase();
 
       const wantCheckUsuario = !!debUsuario && !sameUsuario;
       const correoUsable     = !!debCorreo && isValidEmail(debCorreo);
@@ -152,7 +154,7 @@ function UsuarioForm({ initial = {}, roles = [], onSubmit, loading, excludeId, m
     }
     check();
     return () => { cancel = true; };
-  }, [debUsuario, debCorreo, excludeId, initial.usuario, initial.correo, f.usuario, f.correo]);
+  }, [debUsuario, debCorreo, excludeId, initial?.usuario, initial?.correo, f.usuario, f.correo]);
 
   const valid = f.nombre && f.usuario && f.correo && emailValid && f.rolId && !dup.usuario && !dup.correo;
 
@@ -201,11 +203,13 @@ function UsuarioForm({ initial = {}, roles = [], onSubmit, loading, excludeId, m
       <label>Rol
         <select
           className="u-input"
-          value={String(f.rolId || "")}
+          value={String(f.rolId ?? "")}      {/* ← CONTROLADO siempre string */}
           onChange={e => set("rolId", e.target.value)}
         >
           <option value="">Seleccionar…</option>
-          {roles.map(r => <option key={r.id} value={String(r.id)}>{r.nombre}</option>)}
+          {(roles || []).map(r => (
+            <option key={r.id} value={String(r.id)}>{r.nombre}</option>
+          ))}
         </select>
       </label>
 
