@@ -5,19 +5,43 @@ import axios from "axios";
 function readToken() {
   try {
     let raw = localStorage.getItem("token") || "";
-    raw = raw.replace(/^"+|"+$/g, "");           // quita comillas
-    raw = raw.replace(/^Bearer\s+/i, "");        // quita "Bearer "
+    raw = raw.replace(/^"+|"+$/g, "");    // quita comillas
+    raw = raw.replace(/^Bearer\s+/i, ""); // quita "Bearer "
     return raw.trim();
-  } catch { return ""; }
+  } catch {
+    return "";
+  }
 }
+
+/** decode Base64URL seguro (sin usar escape/unescape) */
+function base64UrlToStr(b64url = "") {
+  try {
+    // normaliza a base64 estándar
+    let b64 = String(b64url).replace(/-/g, "+").replace(/_/g, "/");
+    // padding
+    while (b64.length % 4) b64 += "=";
+    // atob
+    const bin = atob(b64);
+    // convierte binario -> string (UTF-8 seguro)
+    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    const dec = new TextDecoder("utf-8");
+    return dec.decode(bytes);
+  } catch {
+    return "";
+  }
+}
+
 function decodeJwtPayload(jwt = "") {
   try {
-    const p = jwt.split(".");
-    if (p.length < 2) return null;
-    const json = atob(p[1].replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(decodeURIComponent(escape(json)));
-  } catch { return null; }
+    const parts = String(jwt).split(".");
+    if (parts.length < 2) return null;
+    const json = base64UrlToStr(parts[1]);
+    return JSON.parse(json || "{}");
+  } catch {
+    return null;
+  }
 }
+
 function isExpired(jwt = "") {
   const pl = decodeJwtPayload(jwt);
   if (!pl || !pl.exp) return false;
@@ -27,9 +51,11 @@ function isExpired(jwt = "") {
 /** Prefija /api si hace falta (no toca URLs absolutas ni las que ya empiezan con /api) */
 function ensureApiPath(url = "") {
   if (!url) return url;
-  if (/^https?:\/\//i.test(url)) return url;         // absoluta → no tocar
+  // Absoluta → no tocar
+  if (/^https?:\/\//i.test(url)) return url;
+  // Empieza con slash → garantizar /api/...
   if (url.startsWith("/")) return url.startsWith("/api") ? url : "/api" + url;
-  // relativa: "usuarios/..." -> "/api/usuarios/..."
+  // Relativa: "usuarios/..." -> "/api/usuarios/..."
   return url.startsWith("api/") ? "/" + url : "/api/" + url;
 }
 
@@ -37,7 +63,7 @@ function ensureApiPath(url = "") {
 function resolveApiUrl() {
   const fromEnv = (process.env.REACT_APP_API_URL || process.env.VITE_API_URL || "")
     .trim()
-    .replace(/\/+$/, "");
+    .replace(/\/+$/, ""); // sin trailing slash
   if (fromEnv) return fromEnv;
 
   const isLocal =
@@ -49,31 +75,36 @@ function resolveApiUrl() {
     : "https://desechoshospitalsantabarbara-production.up.railway.app";
 }
 
+/* ================ Instancia Axios ================ */
 const http = axios.create({
-  baseURL: resolveApiUrl(),   // SIN /api
+  baseURL: resolveApiUrl(), // SIN /api → lo añade ensureApiPath
   withCredentials: false,
   timeout: 15000,
 });
 
 /* ================ Interceptores ================ */
 
-// Inyecta token y corrige path ANTES del logger
+// Inyecta token y asegura /api en rutas relativas (antes del logger)
 http.interceptors.request.use((config) => {
   // 1) token
   const jwt = readToken();
   if (jwt && !isExpired(jwt)) {
     config.headers.Authorization = `Bearer ${jwt}`;
   } else {
-    delete config.headers.Authorization;
+    if (config.headers && "Authorization" in config.headers) {
+      delete config.headers.Authorization;
+    }
   }
-  // 2) asegurar /api en rutas relativas
+
+  // 2) asegurar /api en rutas relativas (permite desactivarlo con noApiPrefix)
   if (!config.noApiPrefix) {
     config.url = ensureApiPath(config.url || "");
   }
+
   return config;
 });
 
-// Logger
+// Logger de salida
 http.interceptors.request.use((cfg) => {
   try {
     const full = (cfg.baseURL || "") + (cfg.url || "");
@@ -83,7 +114,7 @@ http.interceptors.request.use((cfg) => {
   return cfg;
 });
 
-// 401 + expiración
+// Manejo 401 + expiración con redirect (salteable con skip401Redirect)
 let IS_REDIRECTING_401 = false;
 http.interceptors.response.use(
   (res) => res,
@@ -109,12 +140,17 @@ http.interceptors.response.use(
         localStorage.removeItem("usuario");
         localStorage.removeItem("permisos");
       } catch {}
-      delete http.defaults.headers.common?.Authorization;
+      if (http?.defaults?.headers?.common?.Authorization) {
+        delete http.defaults.headers.common.Authorization;
+      }
 
       if (!IS_REDIRECTING_401 && typeof window !== "undefined") {
         IS_REDIRECTING_401 = true;
         const here = window.location.pathname + window.location.search;
-        const qs = new URLSearchParams({ expired: expired ? "1" : "0", next: here }).toString();
+        const qs = new URLSearchParams({
+          expired: expired ? "1" : "0",
+          next: here,
+        }).toString();
         window.location.href = `/login?${qs}`;
       }
     }
@@ -123,18 +159,19 @@ http.interceptors.response.use(
   }
 );
 
-// Carga inicial del header
+// Carga inicial del header Authorization (en caliente)
 try {
   const jwt = readToken();
   if (jwt && !isExpired(jwt)) {
     http.defaults.headers.common.Authorization = `Bearer ${jwt}`;
-  } else {
-    delete http.defaults.headers.common?.Authorization;
+  } else if (http?.defaults?.headers?.common?.Authorization) {
+    delete http.defaults.headers.common.Authorization;
   }
 } catch {}
 
 // eslint-disable-next-line no-console
 console.info("[API] baseURL =", http.defaults.baseURL);
 
-export { http };
-export default http;
+/* ================ Exports ================ */
+export { http };     // por si algo viejo hacía import { http }
+export default http; // recomendado: import http from "./config/api";
