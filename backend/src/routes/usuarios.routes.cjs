@@ -193,15 +193,21 @@ module.exports = function usuariosRoutes(
     if (!nombre || !usuario || !correo || !rolId)
       return res.status(400).json({ mensaje: 'Faltan campos' });
 
+    // ✅ Validar que el rol exista y esté activo
+    const rol = await prisma.rol.findUnique({ where: { id: Number(rolId) } });
+    if (!rol || !rol.activo) {
+      return res.status(400).json({ mensaje: 'Rol inválido o inactivo.' });
+    }
+
     const temp = randPass(10);
     const hash = await bcrypt.hash(temp, SALT_ROUNDS);
     try {
       const nuevo = await prisma.usuario.create({
         data: {
           nombre,
-          usuario,
-          correo,
-          rolId: Number(rolId),
+          usuario: String(usuario).trim(),
+          correo: String(correo).trim(),
+          rolId: rol.id, // ✅ usar el rol validado
           contrasena: hash,
           debeCambiarPassword: true,
           estado: true,
@@ -211,12 +217,16 @@ module.exports = function usuariosRoutes(
         include: { rol: true },
       });
 
+      // (opcional) Debug:
+      // console.log('[DEBUG correo crear]', { rolIdOriginal: rolId, rolValidado: rol.id, rolNombre: rol.nombre, includeNombre: nuevo.rol?.nombre });
+
       await sendNewUserEmail({
-        to: correo,
-        nombre,
-        usuario,
+        to: nuevo.correo,
+        nombre: nuevo.nombre,
+        usuario: nuevo.usuario,
         tempPassword: temp,
-        rolNombre: nuevo.rol?.nombre || 'Sin rol',
+        // ✅ pasar SIEMPRE el nombre del rol validado (evita "Sin rol")
+        rolNombre: rol.nombre,
       });
 
       res.status(201).json(usuarioPublico(nuevo));
@@ -237,9 +247,21 @@ module.exports = function usuariosRoutes(
     try {
       const id = Number(req.params.id);
       const { nombre, usuario, correo, rolId } = req.body || {};
+
+      // ✅ Validar rol antes de guardar
+      const rol = await prisma.rol.findUnique({ where: { id: Number(rolId) } });
+      if (!rol || !rol.activo) {
+        return res.status(400).json({ mensaje: 'Rol inválido o inactivo.' });
+      }
+
       const upd = await prisma.usuario.update({
         where: { id },
-        data: { nombre, usuario, correo, rolId: Number(rolId) },
+        data: {
+          nombre,
+          usuario: String(usuario).trim(),
+          correo: String(correo).trim(),
+          rolId: rol.id, // ✅ usar el rol validado
+        },
         include: { rol: true },
       });
       res.json(usuarioPublico(upd));
