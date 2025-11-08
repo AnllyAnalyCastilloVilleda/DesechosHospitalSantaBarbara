@@ -83,42 +83,37 @@ function isValidEmail(s = "") {
 }
 
 /* ============ Formulario (sin contraseñas) ============ */
-// ⚠️ OJO: SIN default {} en `initial` para no disparar el useEffect cada render.
+/* Estados separados: evita que un set() de otro campo “pise” el rolId */
 function UsuarioForm({ initial, roles = [], onSubmit, loading, excludeId, mode = "create" }) {
-  const [f, setF] = useState({
-    nombre: "",
-    usuario: "",
-    correo: "",
-    rolId: "",           // string para el <select>
-    ...(initial || {}),
-  });
+  // ---- Estados por campo (siempre string para el select) ----
+  const [nombre, setNombre]   = useState("");
+  const [usuario, setUsuario] = useState("");
+  const [correo, setCorreo]   = useState("");
+  const [rolId, setRolId]     = useState(""); // controlado (string)
 
-  // Normaliza rolId solo cuando EDITAS (cuando sí hay initial)
+  // Cargar valores SOLO cuando hay initial (editar)
   useEffect(() => {
-    if (!initial) return; // ← evita reseteos en "crear"
-    setF(s => ({
-      ...s,
-      ...initial,
-      rolId: initial.rolId != null ? String(initial.rolId) : "",
-    }));
+    if (!initial) return;
+    setNombre(initial.nombre ?? "");
+    setUsuario(initial.usuario ?? "");
+    setCorreo(initial.correo ?? "");
+    setRolId(initial.rolId != null ? String(initial.rolId) : "");
   }, [initial]);
 
-  const set = (k, v) => setF(s => ({ ...s, [k]: v }));
-
+  // ---- Verificación de duplicados (no toca rolId) ----
   const [checking, setChecking] = useState(false);
   const [dup, setDup] = useState({ usuario: false, correo: false });
 
-  const debUsuario = useDebounced(f.usuario, 400);
-  const debCorreo  = useDebounced(f.correo,  400);
-  const emailValid = !f.correo || isValidEmail(f.correo);
-  const emailInvalid = !!f.correo && !emailValid;
+  const debUsuario = useDebounced(usuario, 400);
+  const debCorreo  = useDebounced(correo,  400);
+  const emailValid   = !correo || isValidEmail(correo);
+  const emailInvalid = !!correo && !emailValid;
 
-  // Verificar usuario/correo ocupados
   useEffect(() => {
     let cancel = false;
     async function check() {
-      const sameUsuario = (initial?.usuario || "").toLowerCase() === (f.usuario || "").toLowerCase();
-      const sameCorreo  = (initial?.correo  || "").toLowerCase() === (f.correo  || "").toLowerCase();
+      const sameUsuario = (initial?.usuario || "").toLowerCase() === (usuario || "").toLowerCase();
+      const sameCorreo  = (initial?.correo  || "").toLowerCase() === (correo  || "").toLowerCase();
 
       const wantCheckUsuario = !!debUsuario && !sameUsuario;
       const correoUsable     = !!debCorreo && isValidEmail(debCorreo);
@@ -154,25 +149,39 @@ function UsuarioForm({ initial, roles = [], onSubmit, loading, excludeId, mode =
     }
     check();
     return () => { cancel = true; };
-  }, [debUsuario, debCorreo, excludeId, initial?.usuario, initial?.correo, f.usuario, f.correo]);
+  }, [debUsuario, debCorreo, excludeId, initial?.usuario, initial?.correo, usuario, correo]);
 
-  const valid = f.nombre && f.usuario && f.correo && emailValid && f.rolId && !dup.usuario && !dup.correo;
+  // ---- Validación (rolId requerido) ----
+  const valid =
+    nombre.trim() &&
+    usuario.trim() &&
+    correo.trim() &&
+    emailValid &&
+    rolId !== "" &&
+    !dup.usuario &&
+    !dup.correo;
+
+  // ---- Submit ----
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!valid) return;
+    onSubmit({
+      nombre: nombre.trim(),
+      usuario: usuario.trim(),
+      correo: correo.trim(),
+      rolId: Number(rolId), // convierte al enviar
+    });
+  };
 
   return (
-    <form
-      className="u-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (valid) onSubmit({ nombre: f.nombre, usuario: f.usuario, correo: f.correo, rolId: Number(f.rolId) });
-      }}
-    >
+    <form className="u-form" onSubmit={handleSubmit}>
       <label>Nombre completo
-        <input className="u-input" value={f.nombre} onChange={e => set("nombre", e.target.value)} />
+        <input className="u-input" value={nombre} onChange={e => setNombre(e.target.value)} />
       </label>
 
       <label>Nombre de usuario
-        <input className="u-input" value={f.usuario} onChange={e => set("usuario", e.target.value)} />
-        {f.usuario ? (
+        <input className="u-input" value={usuario} onChange={e => setUsuario(e.target.value)} />
+        {usuario ? (
           dup.usuario
             ? <div className="hint-bad">Este usuario ya está registrado.</div>
             : <div className="hint-muted">Usuario disponible.</div>
@@ -185,11 +194,11 @@ function UsuarioForm({ initial, roles = [], onSubmit, loading, excludeId, mode =
         <input
           type="email"
           className={`u-input ${emailInvalid ? "is-invalid" : ""}`}
-          value={f.correo}
-          onChange={(e) => set("correo", e.target.value)}
+          value={correo}
+          onChange={(e) => setCorreo(e.target.value)}
           aria-invalid={emailInvalid}
         />
-        {!f.correo ? (
+        {!correo ? (
           <div className="hint-muted">Escribe un correo válido.</div>
         ) : !emailValid ? (
           <div className="hint-bad">Formato de correo inválido.</div>
@@ -203,13 +212,18 @@ function UsuarioForm({ initial, roles = [], onSubmit, loading, excludeId, mode =
       <label>Rol
         <select
           className="u-input"
-          value={String(f.rolId ?? "")}      {/* ← CONTROLADO siempre string */}
-          onChange={e => set("rolId", e.target.value)}
+          value={rolId}                         /* CONTROLADO (string) */
+          onChange={(e) => setRolId(e.target.value || "")}
         >
           <option value="">Seleccionar…</option>
-          {(roles || []).map(r => (
-            <option key={r.id} value={String(r.id)}>{r.nombre}</option>
-          ))}
+          {(roles || []).map((r) => {
+            const rid = r.id ?? r.rolId ?? r.id_rol; // tolerante por si el backend cambia el nombre del campo
+            return (
+              <option key={String(rid)} value={String(rid)}>
+                {r.nombre}
+              </option>
+            );
+          })}
         </select>
       </label>
 
@@ -254,7 +268,15 @@ export default function Usuarios() {
   async function loadRoles() {
     try {
       const { data } = await http.get(`/roles?activo=true`);
-      setRoles(data || []);
+      // Normaliza por si el backend devuelve otros nombres de id
+      const norm = Array.isArray(data)
+        ? data.map(r => ({
+            id: r.id ?? r.rolId ?? r.id_rol ?? r.ID ?? r.Id,
+            nombre: r.nombre ?? r.name ?? r.Nombre,
+            activo: r.activo ?? r.enabled ?? r.Activo ?? true,
+          }))
+        : [];
+      setRoles(norm);
     } catch {
       setRoles([]);
     }
@@ -419,114 +441,114 @@ export default function Usuarios() {
             <col className="col-actions" style={{ width: 220 }} />
           </colgroup>
 
-          <thead>
-            <tr>
-              <th>No.</th>
-              <th>Nombre</th>
-              <th>Usuario</th>
-              <th>Correo</th>
-              <th>Rol</th>
-              <th>Estado</th>
-              <th className="th-actions">Acciones</th>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Nombre</th>
+            <th>Usuario</th>
+            <th>Correo</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th className="th-actions">Acciones</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {(rows || []).map((u, i) => (
+            <tr key={u.id}>
+              <td>{i + 1}</td>
+              <td className="u-wrap">{u.nombre}</td>
+              <td className="u-wrap">{u.usuario}</td>
+              <td className="u-wrap">{u.correo}</td>
+              <td className="u-wrap">{u.rol?.nombre || "-"}</td>
+              <td>
+                <span className={`u-status ${u.estado ? 'ok' : 'off'}`}>
+                  {u.estado ? "Activo" : "Desactivado"}
+                </span>
+              </td>
+              <td>
+                {u.estado ? (
+                  <div className="u-row-actions compact">
+                    {/* Editar */}
+                    <button
+                      className="u-iconbtn u-amber"
+                      onClick={() => setEditing(u)}
+                      title="Editar usuario"
+                      aria-label="Editar usuario"
+                      data-tip="Editar"
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                        <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        <path d="M16.5 3.5a2.12 2.12 0 113 3L8 18l-4 1 1-4 11.5-11.5z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+
+                    {/* Correo */}
+                    <button
+                      className="u-iconbtn u-blue"
+                      onClick={() => confirmResend(u)}
+                      title="Enviar correo con contraseña temporal"
+                      aria-label="Enviar correo con contraseña temporal"
+                      data-tip="Reenviar Contraseña Correo"
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                        <path d="M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zm0 0l8 6 8-6"
+                              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+
+                    {/* Desactivar */}
+                    <button
+                      className="u-iconbtn u-danger"
+                      onClick={() => confirmDeactivate(u)}
+                      title="Desactivar usuario"
+                      aria-label="Desactivar usuario"
+                      data-tip="Desactivar"
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2"/>
+                        <path d="M5.6 18.4L18.4 5.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="u-row-actions compact">
+                    {/* Restaurar */}
+                    <button
+                      className="u-iconbtn u-success"
+                      onClick={() => confirmRestore(u)}
+                      title="Restaurar usuario"
+                      aria-label="Restaurar usuario"
+                      data-tip="Restaurar"
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                        <path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+
+                    {/* Eliminar definitivo */}
+                    <button
+                      className="u-iconbtn u-danger"
+                      onClick={() => confirmDelete(u)}
+                      title="Eliminar definitivamente"
+                      aria-label="Eliminar definitivamente"
+                      data-tip="Eliminar"
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                        <path d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </td>
             </tr>
-          </thead>
-
-          <tbody>
-            {(rows || []).map((u, i) => (
-              <tr key={u.id}>
-                <td>{i + 1}</td>
-                <td className="u-wrap">{u.nombre}</td>
-                <td className="u-wrap">{u.usuario}</td>
-                <td className="u-wrap">{u.correo}</td>
-                <td className="u-wrap">{u.rol?.nombre || "-"}</td>
-                <td>
-                  <span className={`u-status ${u.estado ? 'ok' : 'off'}`}>
-                    {u.estado ? "Activo" : "Desactivado"}
-                  </span>
-                </td>
-                <td>
-                  {u.estado ? (
-                    <div className="u-row-actions compact">
-                      {/* Editar */}
-                      <button
-                        className="u-iconbtn u-amber"
-                        onClick={() => setEditing(u)}
-                        title="Editar usuario"
-                        aria-label="Editar usuario"
-                        data-tip="Editar"
-                      >
-                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                          <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                          <path d="M16.5 3.5a2.12 2.12 0 113 3L8 18l-4 1 1-4 11.5-11.5z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-
-                      {/* Correo */}
-                      <button
-                        className="u-iconbtn u-blue"
-                        onClick={() => confirmResend(u)}
-                        title="Enviar correo con contraseña temporal"
-                        aria-label="Enviar correo con contraseña temporal"
-                        data-tip="Reenviar Contraseña Correo"
-                      >
-                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                          <path d="M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zm0 0l8 6 8-6"
-                                fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-
-                      {/* Desactivar */}
-                      <button
-                        className="u-iconbtn u-danger"
-                        onClick={() => confirmDeactivate(u)}
-                        title="Desactivar usuario"
-                        aria-label="Desactivar usuario"
-                        data-tip="Desactivar"
-                      >
-                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2"/>
-                          <path d="M5.6 18.4L18.4 5.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="u-row-actions compact">
-                      {/* Restaurar */}
-                      <button
-                        className="u-iconbtn u-success"
-                        onClick={() => confirmRestore(u)}
-                        title="Restaurar usuario"
-                        aria-label="Restaurar usuario"
-                        data-tip="Restaurar"
-                      >
-                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                          <path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-
-                      {/* Eliminar definitivo */}
-                      <button
-                        className="u-iconbtn u-danger"
-                        onClick={() => confirmDelete(u)}
-                        title="Eliminar definitivamente"
-                        aria-label="Eliminar definitivamente"
-                        data-tip="Eliminar"
-                      >
-                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                          <path d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {(!rows || rows.length === 0) && (
-              <tr>
-                <td colSpan="7" className="u-empty">Sin resultados.</td>
-              </tr>
-            )}
-          </tbody>
+          ))}
+          {(!rows || rows.length === 0) && (
+            <tr>
+              <td colSpan="7" className="u-empty">Sin resultados.</td>
+            </tr>
+          )}
+        </tbody>
         </table>
       </div>
 
