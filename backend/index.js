@@ -77,7 +77,7 @@ app.use(cors({
   optionsSuccessStatus: 204,
 }));
 
-// Preflight global (Express 5): usa parámetro nombrado con comodín
+// Preflight global
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
@@ -97,7 +97,7 @@ app.use('/files', express.static(path.join(process.cwd(), 'files'), {
 }));
 
 /* ==============================
-   Rutas públicas mínimas
+   Rutas públicas mínimas (sin /api para probes)
    ============================== */
 app.get('/', (_req, res) => res.send('OK')); // raíz para probar en Railway
 app.get('/health', (_req, res) => res.json({ ok: true, status: 'healthy' }));
@@ -250,18 +250,19 @@ async function recuperarHandler(req, res) {
 
     res.json(generic);
   } catch (e) {
-    console.error('Error en /auth/recuperar:', e);
+    console.error('Error en /api/auth/recuperar:', e);
     res.json({ ok: true, mensaje: 'Si los datos son correctos, enviaremos instrucciones a tu correo.' });
   }
 }
 
-app.post('/login', loginHandler);
-app.post('/usuarios/login', loginHandler);
-app.post('/auth/recuperar', recuperarHandler);
-app.post('/usuarios/recuperar', recuperarHandler);
+/* ===== Auth endpoints bajo /api ===== */
+app.post('/api/login', loginHandler);
+app.post('/api/usuarios/login', loginHandler);
+app.post('/api/auth/recuperar', recuperarHandler);
+app.post('/api/usuarios/recuperar', recuperarHandler);
 
 /* ==============================
-   Soporte autenticado simple (/me) + alias
+   Soporte autenticado simple (/me) + alias bajo /api
    ============================== */
 async function meHandler(req, res) {
   try {
@@ -285,13 +286,13 @@ async function meHandler(req, res) {
     res.status(500).json({ mensaje: 'Error en el servidor' });
   }
 }
-app.get('/me', auth, meHandler);
-app.get('/usuarios/me', auth, meHandler);
+app.get('/api/me', auth, meHandler);
+app.get('/api/usuarios/me', auth, meHandler);
 
 /* ==============================
-   Rutas de ROLES/PERMISOS
+   Rutas de ROLES/PERMISOS bajo /api
    ============================== */
-app.get('/permisos', auth, requirePerm('ROLES'), async (_req, res) => {
+app.get('/api/permisos', auth, requirePerm('ROLES'), async (_req, res) => {
   try {
     const permisos = await prisma.permiso.findMany({ orderBy: { id: 'asc' } });
     res.json(permisos);
@@ -301,7 +302,7 @@ app.get('/permisos', auth, requirePerm('ROLES'), async (_req, res) => {
   }
 });
 
-app.get('/roles/full', auth, requirePerm('ROLES'), async (_req, res) => {
+app.get('/api/roles/full', auth, requirePerm('ROLES'), async (_req, res) => {
   try {
     const roles = await prisma.rol.findMany({
       orderBy: { id: 'asc' },
@@ -322,7 +323,7 @@ app.get('/roles/full', auth, requirePerm('ROLES'), async (_req, res) => {
   }
 });
 
-app.get('/roles', auth, requirePerm('ROLES'), async (req, res) => {
+app.get('/api/roles', auth, requirePerm('ROLES'), async (req, res) => {
   try {
     const { activo } = req.query;
     const where = typeof activo === 'string' ? { activo: activo === 'true' } : {};
@@ -334,7 +335,7 @@ app.get('/roles', auth, requirePerm('ROLES'), async (req, res) => {
   }
 });
 
-app.get('/roles/:id', auth, requirePerm('ROLES'), async (req, res) => {
+app.get('/api/roles/:id', auth, requirePerm('ROLES'), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const rol = await prisma.rol.findUnique({ where: { id } });
@@ -346,7 +347,7 @@ app.get('/roles/:id', auth, requirePerm('ROLES'), async (req, res) => {
   }
 });
 
-app.post('/roles', auth, requirePerm('ROLES'), async (req, res) => {
+app.post('/api/roles', auth, requirePerm('ROLES'), async (req, res) => {
   try {
     const nombre = (req.body?.nombre || '').trim();
     if (!nombre) return res.status(400).json({ mensaje: 'Nombre requerido' });
@@ -359,7 +360,7 @@ app.post('/roles', auth, requirePerm('ROLES'), async (req, res) => {
   }
 });
 
-app.patch('/roles/:id', auth, requirePerm('ROLES'), async (req, res) => {
+app.patch('/api/roles/:id', auth, requirePerm('ROLES'), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const nombre = (req.body?.nombre || '').trim();
@@ -380,7 +381,7 @@ app.patch('/roles/:id', auth, requirePerm('ROLES'), async (req, res) => {
   }
 });
 
-app.patch('/roles/:id/disable', auth, requirePerm('ROLES'), async (req, res) => {
+app.patch('/api/roles/:id/disable', auth, requirePerm('ROLES'), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const actual = await prisma.rol.findUnique({
@@ -404,7 +405,7 @@ app.patch('/roles/:id/disable', auth, requirePerm('ROLES'), async (req, res) => 
   }
 });
 
-app.patch('/roles/:id/enable', auth, requirePerm('ROLES'), async (req, res) => {
+app.patch('/api/roles/:id/enable', auth, requirePerm('ROLES'), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const actual = await prisma.rol.findUnique({ where: { id } });
@@ -418,7 +419,7 @@ app.patch('/roles/:id/enable', auth, requirePerm('ROLES'), async (req, res) => {
   }
 });
 
-app.delete('/roles/:id', auth, requirePerm('ROLES'), async (req, res) => {
+app.delete('/api/roles/:id', auth, requirePerm('ROLES'), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const actual = await prisma.rol.findUnique({
@@ -510,21 +511,21 @@ io.on('connection', (socket) => {
 });
 
 /* ==============================
-   Montaje de routers de negocio
+   Montaje de routers de negocio (todos bajo /api)
    ============================== */
-app.use('/usuarios',     usuariosRoutes(prisma, { auth, requirePerm, sendNewUserEmail, sendTempPasswordEmail }));
-app.use('/areas',        areasRoutes(prisma, { auth, requirePerm }));
-app.use('/bolsas',       bolsasRoutes(prisma, { auth, requirePerm }));
-app.use('/tipos-desecho',tiposDesechoRoutes(prisma, { auth, requirePerm }));
-app.use('/qr',           qrRoutes(prisma, { auth, requirePerm }));
-app.use('/reportes',     reportesRoutes(prisma, { auth, requirePerm }));
-// app.use('/dashboard', dashboardRoutes(prisma, { auth, requirePerm })); // si aplica
-app.use('/api',          registroRoutes(prisma, { auth, requirePerm }));
+app.use('/api/usuarios',      usuariosRoutes(prisma, { auth, requirePerm, sendNewUserEmail, sendTempPasswordEmail }));
+app.use('/api/areas',         areasRoutes(prisma, { auth, requirePerm }));
+app.use('/api/bolsas',        bolsasRoutes(prisma, { auth, requirePerm }));
+app.use('/api/tipos-desecho', tiposDesechoRoutes(prisma, { auth, requirePerm }));
+app.use('/api/qr',            qrRoutes(prisma, { auth, requirePerm }));
+app.use('/api/reportes',      reportesRoutes(prisma, { auth, requirePerm }));
+// app.use('/api/dashboard',  dashboardRoutes(prisma, { auth, requirePerm })); // si aplica
+app.use('/api',               registroRoutes(prisma, { auth, requirePerm })); // mantiene lo que ya exponía
 
 if (scaleSvc) {
-  app.use('/scale', auth, requirePerm('BALANZA'), scaleRoutesFactory(scaleSvc));
+  app.use('/api/scale', auth, requirePerm('BALANZA'), scaleRoutesFactory(scaleSvc));
 } else {
-  app.use('/scale', auth, requirePerm('BALANZA'), (_req, res) => {
+  app.use('/api/scale', auth, requirePerm('BALANZA'), (_req, res) => {
     res.status(503).json({ mensaje: 'Módulo de balanza no disponible en este entorno' });
   });
 }
